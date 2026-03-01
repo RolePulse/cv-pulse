@@ -1,0 +1,171 @@
+// CV Pulse — Score API
+// Epic 4 | POST /api/cv/[id]/score — runs deterministic scoring engine, saves to DB
+
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { scoreCV } from '@/lib/scorer'
+import type { StructuredCV } from '@/types/database'
+import type { TargetRole } from '@/lib/roleDetect'
+import { ALL_ROLES } from '@/lib/roleDetect'
+
+export async function POST(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Sign in required' }, { status: 401 })
+  }
+
+  // ── Fetch CV ──────────────────────────────────────────────────────────────
+  const { data: cv } = await supabase
+    .from('cvs')
+    .select('id, raw_text, structured_json, target_role')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!cv) {
+    return NextResponse.json({ error: 'CV not found' }, { status: 404 })
+  }
+
+  // ── Validate ──────────────────────────────────────────────────────────────
+  if (!cv.target_role || !(ALL_ROLES as string[]).includes(cv.target_role)) {
+    return NextResponse.json(
+      { error: 'Select a target role before scoring' },
+      { status: 400 }
+    )
+  }
+
+  if (!cv.structured_json || !cv.raw_text) {
+    return NextResponse.json({ error: 'CV has no parseable content' }, { status: 400 })
+  }
+
+  // ── Score ─────────────────────────────────────────────────────────────────
+  const result = scoreCV(
+    cv.structured_json as StructuredCV,
+    cv.raw_text,
+    cv.target_role as TargetRole,
+  )
+
+  // ── Save to scores table ──────────────────────────────────────────────────
+  const bucketScores = {
+    proof_of_impact: result.buckets.proofOfImpact.score,
+    ats_keywords: result.buckets.atsKeywords.score,
+    formatting: result.buckets.formatting.score,
+    clarity: result.buckets.clarity.score,
+  }
+
+  // Build penalties from critical concerns
+  const penalties = result.criticalConcerns.map((concern) => ({
+    code: concern.replace(/\s+/g, '_').toLowerCase().slice(0, 50),
+    reason: concern,
+  }))
+
+  // Checklist for DB (simplified schema)
+  const checklistForDB = result.checklist.map((item) => ({
+    id: item.id,
+    done: item.done,
+    action: item.action,
+    why: item.whyItMatters,
+    example: '',
+    points: item.potentialPoints,
+  }))
+
+  const { data: score, error: insertError } = await supabase
+    .from('scores')
+    .insert({
+      cv_id: id,
+      overall_score: result.overallScore,
+      pass_fail: result.passFail,
+      bucket_scores_json: bucketScores,
+      penalties_json: penalties,
+      checklist_json: checklistForDB,
+    })
+    .select()
+    .single()
+
+  if (insertError || !score) {
+    console.error('[score] Supabase insert error:', insertError?.message)
+    return NextResponse.json({ error: 'Failed to save score — please try again' }, { status: 500 })
+  }
+
+  // ── Log event ─────────────────────────────────────────────────────────────
+  await supabase.from('events').insert({
+    event_name: 'cv_scored',
+    user_id: user.id,
+    meta_json: {
+      cv_id: id,
+      score_id: score.id,
+      overall_score: result.overallScore,
+      pass_fail: result.passFail,
+      target_role: cv.target_role,
+    },
+  })
+
+  // ── Return full result ────────────────────────────────────────────────────
+  return NextResponse.json({
+    ok: true,
+    scoreId: score.id,
+    result,
+  })
+}
+
+// ── GET — fetch existing score for this CV ────────────────────────────────────
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Sign in required' }, { status: 401 })
+  }
+
+  // Verify ownership
+  const { data: cv } = await supabase
+    .from('cvs')
+    .select('id, target_role, structured_json, raw_text')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!cv) {
+    return NextResponse.json({ error: 'CV not found' }, { status: 404 })
+  }
+
+  // Get latest score
+  const { data: score } = await supabase
+    .from('scores')
+    .select('*')
+    .eq('cv_id', id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (!score) {
+    return NextResponse.json({ hasScore: false })
+  }
+
+  return NextResponse.json({
+    hasScore: true,
+    score: {
+      id: score.id,
+      overallScore: score.overall_score,
+      passFail: score.pass_fail,
+      bucketScores: score.bucket_scores_json,
+      penalties: score.penalties_json,
+      checklist: score.checklist_json,
+      createdAt: score.created_at,
+    },
+  })
+}

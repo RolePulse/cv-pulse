@@ -136,7 +136,7 @@ export default function UploadPage() {
     }
 
     setStep('ready')
-    router.push(`/results?cvId=${data.cvId}`)
+    router.push(`/select-role?cvId=${data.cvId}`)
   }
 
   function switchToPaste() {

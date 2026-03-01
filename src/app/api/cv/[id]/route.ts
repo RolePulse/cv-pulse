@@ -13,7 +13,9 @@ import type { StructuredCV } from '@/types/database'
 function structuredToRawText(s: StructuredCV): string {
   const lines: string[] = []
 
+  // SUMMARY heading required — parser ignores text before the first detected section heading
   if (s.summary?.trim()) {
+    lines.push('SUMMARY')
     lines.push(s.summary.trim())
     lines.push('')
   }
@@ -21,12 +23,13 @@ function structuredToRawText(s: StructuredCV): string {
   if (s.experience?.length) {
     lines.push('EXPERIENCE')
     for (const role of s.experience) {
-      const header = [role.title, role.company, [role.start, role.end].filter(Boolean).join(' – ')]
-        .filter(Boolean)
-        .join(' | ')
-      lines.push(header)
+      // Title on its own line — parser reads the line ABOVE the date-bearing line as the job title
+      if (role.title?.trim()) lines.push(role.title.trim())
+      // Company | Date range on the next line — parser anchors role extraction on the date here
+      const datePart = [role.start, role.end ?? 'Present'].filter(Boolean).join(' – ')
+      lines.push([role.company, datePart].filter(Boolean).join(' | '))
       for (const bullet of role.bullets) {
-        lines.push(`• ${bullet}`)
+        if (bullet.trim()) lines.push(`• ${bullet.trim()}`)
       }
       lines.push('')
     }
@@ -34,7 +37,7 @@ function structuredToRawText(s: StructuredCV): string {
 
   if (s.skills?.length) {
     lines.push('SKILLS')
-    lines.push(s.skills.join(', '))
+    lines.push(s.skills.filter(Boolean).join(', '))
     lines.push('')
   }
 
@@ -49,7 +52,7 @@ function structuredToRawText(s: StructuredCV): string {
   if (s.certifications?.length) {
     lines.push('CERTIFICATIONS')
     for (const cert of s.certifications) {
-      lines.push(cert)
+      if (cert.trim()) lines.push(cert.trim())
     }
   }
 

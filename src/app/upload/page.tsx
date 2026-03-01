@@ -7,6 +7,7 @@ import Header from '@/components/Header'
 import ProgressIndicator from '@/components/ProgressIndicator'
 import Button from '@/components/Button'
 import AlertBanner from '@/components/AlertBanner'
+import { createClient } from '@/lib/supabase/client'
 
 type UploadStep = 'idle' | 'parsing' | 'structuring' | 'validating' | 'ready' | 'failed' | 'gate_failed'
 
@@ -24,6 +25,8 @@ const STEP_ORDER: UploadStep[] = ['parsing', 'structuring', 'validating', 'ready
 
 export default function UploadPage() {
   const router = useRouter()
+  const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null) // null = loading
+  const [signingIn, setSigningIn] = useState(false)
   const [deletedBanner, setDeletedBanner] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [file, setFile] = useState<File | null>(null)
@@ -35,6 +38,14 @@ export default function UploadPage() {
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [termsError, setTermsError] = useState(false)
 
+  // Check auth state on mount
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsSignedIn(!!user)
+    })
+  }, [])
+
   // Show banner when redirected after CV deletion
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -44,6 +55,18 @@ export default function UploadPage() {
       window.history.replaceState({}, '', '/upload')
     }
   }, [])
+
+  async function handleGoogleSignIn() {
+    setSigningIn(true)
+    const supabase = createClient()
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/api/auth/callback`,
+      },
+    })
+    // Page will redirect — no need to setSigningIn(false)
+  }
 
   const hasContent = !!file || pasteText.trim().length > 100
   const isProcessing = ['parsing', 'structuring', 'validating', 'ready'].includes(step)
@@ -193,6 +216,44 @@ export default function UploadPage() {
         <p className="text-[#444444] text-center mb-8 text-sm">
           We&apos;ll score it against your target role and show you exactly what to fix.
         </p>
+
+        {/* Sign-in wall — shown when not authenticated */}
+        {isSignedIn === false && (
+          <div className="bg-white rounded-[12px] border border-[#DDDDDD] p-8 text-center">
+            <div className="w-12 h-12 bg-[#FFF0E6] rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-[#FF6B00]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-semibold text-[#222222] mb-2">Sign in to get started</h2>
+            <p className="text-sm text-[#666666] mb-6">
+              Create a free account to upload your CV, get your score, and see exactly what to fix.
+            </p>
+            <Button
+              onClick={handleGoogleSignIn}
+              disabled={signingIn}
+              className="w-full sm:w-auto"
+            >
+              {signingIn ? 'Redirecting…' : 'Sign in with Google'}
+            </Button>
+            <p className="text-xs text-[#888888] mt-4">
+              By signing in you agree to our{' '}
+              <Link href="/terms" className="underline hover:text-[#FF6B00]">Terms</Link>
+              {' '}and{' '}
+              <Link href="/privacy" className="underline hover:text-[#FF6B00]">Privacy Policy</Link>.
+            </p>
+          </div>
+        )}
+
+        {/* Auth loading state */}
+        {isSignedIn === null && (
+          <div className="bg-white rounded-[12px] border border-[#DDDDDD] p-8 text-center">
+            <p className="text-sm text-[#888888]">Loading…</p>
+          </div>
+        )}
+
+        {/* Upload form — only shown when signed in */}
+        {isSignedIn === true && (<>
 
         {/* CV deleted success banner */}
         {deletedBanner && (
@@ -371,6 +432,8 @@ export default function UploadPage() {
             </Button>
           </div>
         )}
+
+        </>)}
       </main>
 
       {/* Footer */}

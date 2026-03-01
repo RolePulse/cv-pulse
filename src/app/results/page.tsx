@@ -194,6 +194,12 @@ function ResultsContent() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ScoreResult | null>(null)
 
+  // Share link state
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [shareLoading, setShareLoading] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
   useEffect(() => {
     if (!cvId) { router.replace('/upload'); return }
 
@@ -404,6 +410,65 @@ function ResultsContent() {
             )}
           </div>
         )}
+
+        {/* Share results */}
+        <div className="mb-4">
+          {!shareUrl ? (
+            <Button
+              variant="secondary"
+              size="md"
+              className="w-full justify-center"
+              loading={shareLoading}
+              onClick={async () => {
+                setShareLoading(true)
+                setShareError(null)
+                try {
+                  const res = await fetch(`/api/cv/${cvId}/share`, { method: 'POST' })
+                  const data = await res.json()
+                  if (!res.ok || !data.ok) {
+                    setShareError(data.error || 'Could not create share link')
+                  } else {
+                    setShareUrl(data.shareUrl)
+                  }
+                } catch {
+                  setShareError('Network error — please try again')
+                }
+                setShareLoading(false)
+              }}
+            >
+              Share results
+            </Button>
+          ) : (
+            <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <p className="text-sm font-semibold text-[#222222] mb-2">Shareable link</p>
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={shareUrl}
+                  className="flex-1 text-sm text-[#444444] bg-[#F8F8F8] border border-[#DDDDDD] rounded-md px-3 py-2 truncate"
+                />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(shareUrl)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }}
+                >
+                  {copied ? 'Copied!' : 'Copy link'}
+                </Button>
+              </div>
+              <p className="text-xs text-[#999999]">
+                Shared view includes your score and checklist — no personal info.
+              </p>
+            </div>
+          )}
+          {shareError && (
+            <p className="text-xs text-[#DC2626] mt-2">{shareError}</p>
+          )}
+        </div>
 
         {/* CTA */}
         <Button variant="primary" size="lg" className="w-full justify-center" onClick={() => router.push(`/editor?cvId=${cvId}`)}>

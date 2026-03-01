@@ -124,4 +124,5 @@ export interface RedactedSummary {
   target_role: string | null
   bucket_scores: BucketScores
   checklist_titles: string[]
+  scored_at: string
 }

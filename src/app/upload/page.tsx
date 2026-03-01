@@ -1,29 +1,162 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Header from '@/components/Header'
 import ProgressIndicator from '@/components/ProgressIndicator'
 import Button from '@/components/Button'
+import AlertBanner from '@/components/AlertBanner'
+
+type UploadStep = 'idle' | 'parsing' | 'structuring' | 'validating' | 'ready' | 'failed' | 'gate_failed'
+
+const STEP_LABELS: Record<UploadStep, string> = {
+  idle: '',
+  parsing: 'Parsing your PDF…',
+  structuring: 'Structuring your CV…',
+  validating: 'Validating quality…',
+  ready: 'Ready — loading results…',
+  failed: '',
+  gate_failed: '',
+}
+
+const STEP_ORDER: UploadStep[] = ['parsing', 'structuring', 'validating', 'ready']
 
 export default function UploadPage() {
+  const router = useRouter()
   const [isDragging, setIsDragging] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [showPaste, setShowPaste] = useState(false)
   const [pasteText, setPasteText] = useState('')
+  const [step, setStep] = useState<UploadStep>('idle')
+  const [error, setError] = useState<string | null>(null)
+  const [gateReason, setGateReason] = useState<string | null>(null)
 
   const hasContent = !!file || pasteText.trim().length > 100
+  const isProcessing = ['parsing', 'structuring', 'validating', 'ready'].includes(step)
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
     const dropped = e.dataTransfer.files[0]
-    if (dropped?.type === 'application/pdf') setFile(dropped)
+    if (dropped?.type === 'application/pdf') {
+      setFile(dropped)
+      setError(null)
+      setGateReason(null)
+    }
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0]
-    if (selected?.type === 'application/pdf') setFile(selected)
+    if (selected?.type === 'application/pdf') {
+      setFile(selected)
+      setError(null)
+      setGateReason(null)
+    }
   }
+
+  // Simulate processing step progression with delays
+  async function animateSteps(onDone: () => void) {
+    for (const s of STEP_ORDER.slice(0, 3)) {
+      setStep(s)
+      await sleep(700)
+    }
+    onDone()
+  }
+
+  async function handleSubmit() {
+    if (!hasContent || isProcessing) return
+    setError(null)
+    setGateReason(null)
+
+    // Start animation alongside actual fetch
+    let fetchDone = false
+    let fetchResult: { ok: boolean; cvId?: string; confidence?: number; failReason?: string; error?: string } | null = null
+
+    // Kick off animation
+    animateSteps(() => {
+      if (fetchDone && fetchResult) handleResult(fetchResult)
+    })
+
+    // Kick off actual upload
+    let response: Response
+    try {
+      if (file) {
+        const fd = new FormData()
+        fd.append('cv', file)
+        response = await fetch('/api/upload', { method: 'POST', body: fd })
+      } else {
+        response = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: pasteText }),
+        })
+      }
+    } catch {
+      setStep('failed')
+      setError('Network error — check your connection and try again.')
+      return
+    }
+
+    if (response.status === 401) {
+      setStep('failed')
+      setError('You need to sign in before uploading your CV.')
+      return
+    }
+
+    let data: typeof fetchResult
+    try {
+      data = await response.json()
+    } catch {
+      setStep('failed')
+      setError('Unexpected response from the server — please try again.')
+      return
+    }
+
+    fetchDone = true
+    fetchResult = data
+
+    // If animation has already completed, handle result immediately
+    if (step === 'ready' || step === 'failed' || step === 'gate_failed') {
+      handleResult(fetchResult!)
+    }
+    // Otherwise the animateSteps callback will call handleResult when done
+  }
+
+  function handleResult(data: { ok: boolean; cvId?: string; failReason?: string; error?: string }) {
+    if (!data.ok) {
+      if (data.failReason) {
+        // Confidence gate failure
+        setStep('gate_failed')
+        setGateReason(data.failReason)
+      } else {
+        setStep('failed')
+        setError(data.error || 'Something went wrong — please try again.')
+      }
+      return
+    }
+
+    setStep('ready')
+    router.push(`/results?cvId=${data.cvId}`)
+  }
+
+  function switchToPaste() {
+    setShowPaste(true)
+    setFile(null)
+    setStep('idle')
+    setError(null)
+    setGateReason(null)
+  }
+
+  function switchToPdf() {
+    setShowPaste(false)
+    setPasteText('')
+    setStep('idle')
+    setError(null)
+    setGateReason(null)
+  }
+
+  const currentStepLabel = isProcessing ? STEP_LABELS[step] : null
+  const currentStepIndex = STEP_ORDER.indexOf(step)
 
   return (
     <div className="min-h-screen bg-[#FFF7F2]">
@@ -37,11 +170,57 @@ export default function UploadPage() {
 
         <h1 className="text-2xl font-bold text-[#222222] mb-2 text-center">Upload your CV</h1>
         <p className="text-[#444444] text-center mb-8 text-sm">
-          We'll score it against your target role and show you exactly what to fix.
+          We&apos;ll score it against your target role and show you exactly what to fix.
         </p>
 
+        {/* Error banner */}
+        {error && (
+          <div className="mb-6">
+            <AlertBanner type="error" message={error} onDismiss={() => setError(null)} />
+          </div>
+        )}
+
+        {/* Confidence gate failure */}
+        {step === 'gate_failed' && gateReason && (
+          <div className="mb-6 rounded-[8px] border border-[#FED7AA] bg-[#FFF7ED] p-4">
+            <p className="text-sm font-semibold text-[#9A3412] mb-1">We couldn&apos;t read this PDF reliably</p>
+            <p className="text-sm text-[#7C3A10] mb-3">{gateReason}</p>
+            <button
+              type="button"
+              onClick={switchToPaste}
+              className="text-sm font-medium text-[#FF6B00] hover:text-[#E85F00] transition-colors"
+            >
+              Paste your CV text instead →
+            </button>
+          </div>
+        )}
+
+        {/* Processing steps */}
+        {isProcessing && (
+          <div className="mb-8 rounded-[8px] border border-[#DDDDDD] bg-white p-6">
+            <p className="text-sm font-medium text-[#222222] mb-4">{currentStepLabel}</p>
+            <div className="flex gap-2">
+              {STEP_ORDER.slice(0, 3).map((s, i) => (
+                <div key={s} className="flex-1 flex flex-col items-center gap-1.5">
+                  <div
+                    className={[
+                      'h-1.5 w-full rounded-full transition-all duration-500',
+                      i < currentStepIndex
+                        ? 'bg-[#FF6B00]'
+                        : i === currentStepIndex
+                        ? 'bg-[#FF6B00] opacity-70'
+                        : 'bg-[#EEEEEE]',
+                    ].join(' ')}
+                  />
+                  <span className="text-[10px] text-[#999999] capitalize">{s}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Upload dropzone */}
-        {!showPaste && (
+        {!showPaste && !isProcessing && step !== 'gate_failed' && (
           <label
             htmlFor="cv-upload"
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
@@ -89,22 +268,24 @@ export default function UploadPage() {
         )}
 
         {/* Paste toggle */}
-        <div className="mt-4 text-center">
-          <button
-            type="button"
-            onClick={() => { setShowPaste(!showPaste); setFile(null) }}
-            className="text-sm text-[#FF6B00] hover:text-[#E85F00] transition-colors cursor-pointer"
-          >
-            {showPaste ? '← Upload a PDF instead' : 'Or paste your CV text'}
-          </button>
-        </div>
+        {!isProcessing && (
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={showPaste ? switchToPdf : switchToPaste}
+              className="text-sm text-[#FF6B00] hover:text-[#E85F00] transition-colors cursor-pointer"
+            >
+              {showPaste ? '← Upload a PDF instead' : 'Or paste your CV text'}
+            </button>
+          </div>
+        )}
 
         {/* Paste textarea */}
-        {showPaste && (
+        {showPaste && !isProcessing && (
           <div className="mt-4">
             <textarea
               value={pasteText}
-              onChange={(e) => setPasteText(e.target.value)}
+              onChange={(e) => { setPasteText(e.target.value); setStep('idle') }}
               placeholder="Paste your full CV here…"
               rows={14}
               className="w-full rounded-[6px] border border-[#DDDDDD] bg-white px-4 py-3 text-sm text-[#222222] placeholder:text-[#999999] focus:outline-none focus:border-[#FF6B00] resize-none transition-colors"
@@ -116,18 +297,24 @@ export default function UploadPage() {
         )}
 
         {/* CTA */}
-        <div className="mt-8">
-          <Button
-            variant="primary"
-            size="lg"
-            disabled={!hasContent}
-            className="w-full justify-center"
-          >
-            Analyse my CV →
-          </Button>
-          {/* Real upload logic wired in Epic 2 */}
-        </div>
+        {!isProcessing && (
+          <div className="mt-8">
+            <Button
+              variant="primary"
+              size="lg"
+              disabled={!hasContent}
+              onClick={handleSubmit}
+              className="w-full justify-center"
+            >
+              Analyse my CV →
+            </Button>
+          </div>
+        )}
       </main>
     </div>
   )
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }

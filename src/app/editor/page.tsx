@@ -9,6 +9,8 @@ import AlertBanner from '@/components/AlertBanner'
 import { createClient } from '@/lib/supabase/client'
 import type { StructuredCV, ExperienceRole, EducationEntry } from '@/types/database'
 import type { ScoreResult } from '@/lib/scorer'
+import { detectAvailableFixes, applyFix } from '@/lib/cvFixes'
+import type { AvailableFix } from '@/lib/cvFixes'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -259,6 +261,41 @@ function ScoreHistoryStrip({
   )
 }
 
+// ── Quick fixes panel ─────────────────────────────────────────────────────────
+
+function QuickFixesPanel({
+  fixes,
+  onApply,
+}: {
+  fixes: AvailableFix[]
+  onApply: (fixId: AvailableFix['id']) => void
+}) {
+  if (fixes.length === 0) return null
+
+  return (
+    <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-5 mt-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+      <h3 className="text-[13px] font-semibold text-[#222222] mb-1">Quick fixes</h3>
+      <p className="text-[11px] text-[#888888] mb-3">One click — applies immediately. Re-score to see impact.</p>
+      <div className="space-y-2">
+        {fixes.map((fix) => (
+          <div key={fix.id} className="flex items-start gap-3 group">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-[#333333] leading-snug">{fix.label}</p>
+              <p className="text-[10px] text-[#888888] leading-snug mt-0.5">{fix.description}</p>
+            </div>
+            <button
+              onClick={() => onApply(fix.id)}
+              className="text-[11px] font-semibold text-[#FF6B00] hover:text-[#E85F00] border border-[#FF6B00] hover:border-[#E85F00] rounded-[4px] px-2 py-0.5 flex-shrink-0 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Apply
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Checklist sidebar ─────────────────────────────────────────────────────────
 
 function ChecklistSidebar({
@@ -384,6 +421,7 @@ function EditorContent() {
   const [resolvedCount, setResolvedCount] = useState(0)
   const [totalItems, setTotalItems] = useState(0)
   const [lastEdited, setLastEdited] = useState<string | null>(null)
+  const [availableFixes, setAvailableFixes] = useState<AvailableFix[]>([])
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestCV = useRef<StructuredCV | null>(null)
@@ -428,6 +466,11 @@ function EditorContent() {
 
     load()
   }, [cvId, router])
+
+  // ── Recompute available fixes whenever CV content changes ────────────────
+  useEffect(() => {
+    if (cv) setAvailableFixes(detectAvailableFixes(cv))
+  }, [cv])
 
   // ── Debounced save ────────────────────────────────────────────────────────
   const scheduleSave = useCallback((updated: StructuredCV) => {
@@ -509,6 +552,15 @@ function EditorContent() {
       setIsRescoring(false)
     }
   }, [cvId, isRescoring, flushSave])
+
+  // ── Apply one-click fix ───────────────────────────────────────────────────
+  const handleApplyFix = useCallback((fixId: AvailableFix['id']) => {
+    if (!cv) return
+    const updated = applyFix(cv, fixId)
+    setCV(updated)
+    scheduleSave(updated)
+    // Fixes list recomputes via the useEffect watching cv
+  }, [cv, scheduleSave])
 
   // ── CV field updaters ─────────────────────────────────────────────────────
   const updateSummary = (summary: string) => {
@@ -704,7 +756,7 @@ function EditorContent() {
             </div>
           </div>
 
-          {/* ── Right: checklist ───────────────────────────────────────── */}
+          {/* ── Right: checklist + quick fixes ─────────────────────────── */}
           <div className="w-full lg:w-64 flex-shrink-0">
             {cvId && (
               <ChecklistSidebar
@@ -719,6 +771,10 @@ function EditorContent() {
                 passFail={passFail}
               />
             )}
+            <QuickFixesPanel
+              fixes={availableFixes}
+              onApply={handleApplyFix}
+            />
           </div>
         </div>
       </div>

@@ -1,26 +1,76 @@
 @import "tailwindcss";
 
+/* CV Pulse — Brand Theme
+   Sister product to RolePulse. Same DNA.
+   Source: workspace/cv-pulse/BRAND.md
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand: Orange */
+  --brand-orange: #FF6B00;
+  --brand-orange-hover: #E85F00;
+  --brand-orange-light: #FF6719;
+  --brand-orange-tint: #FFF7F2;
+
+  /* Brand: Neutrals */
+  --brand-dark: #1E1E1E;
+  --brand-text: #222222;
+  --brand-text-secondary: #444444;
+  --brand-muted: #999999;
+  --brand-border: #DDDDDD;
+  --brand-surface-alt: #F0F0F0;
+  --brand-surface: #FAFAFA;
+
+  /* Semantic */
+  --brand-pass: #16A34A;
+  --brand-fail: #DC2626;
+  --brand-warning: #D97706;
+  --brand-info: #2563EB;
+
+  /* Page defaults */
+  --background: #FFF7F2;
+  --foreground: #222222;
 }
 
 @theme inline {
+  /* Background / foreground */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Brand orange */
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-orange-hover: var(--brand-orange-hover);
+  --color-brand-orange-light: var(--brand-orange-light);
+  --color-brand-orange-tint: var(--brand-orange-tint);
+
+  /* Brand neutrals */
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-text: var(--brand-text);
+  --color-brand-text-secondary: var(--brand-text-secondary);
+  --color-brand-muted: var(--brand-muted);
+  --color-brand-border: var(--brand-border);
+  --color-brand-surface-alt: var(--brand-surface-alt);
+  --color-brand-surface: var(--brand-surface);
+
+  /* Semantic */
+  --color-status-pass: var(--brand-pass);
+  --color-status-fail: var(--brand-fail);
+  --color-status-warning: var(--brand-warning);
+  --color-status-info: var(--brand-info);
+
+  /* Typography */
+  --font-sans: 'Inter', 'Helvetica Neue', Helvetica, Arial, Verdana, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Utility: Card shadow */
+.card-shadow {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }

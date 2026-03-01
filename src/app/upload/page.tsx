@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Header from '@/components/Header'
 import ProgressIndicator from '@/components/ProgressIndicator'
 import Button from '@/components/Button'
@@ -31,6 +32,8 @@ export default function UploadPage() {
   const [step, setStep] = useState<UploadStep>('idle')
   const [error, setError] = useState<string | null>(null)
   const [gateReason, setGateReason] = useState<string | null>(null)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [termsError, setTermsError] = useState(false)
 
   // Show banner when redirected after CV deletion
   useEffect(() => {
@@ -76,8 +79,15 @@ export default function UploadPage() {
 
   async function handleSubmit() {
     if (!hasContent || isProcessing) return
+
+    if (!termsAccepted) {
+      setTermsError(true)
+      return
+    }
+
     setError(null)
     setGateReason(null)
+    setTermsError(false)
 
     // Start animation alongside actual fetch
     let fetchDone = false
@@ -318,9 +328,38 @@ export default function UploadPage() {
           </div>
         )}
 
+        {/* Consent checkbox */}
+        {!isProcessing && (
+          <div className="mt-6">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(e) => { setTermsAccepted(e.target.checked); setTermsError(false) }}
+                className="mt-0.5 h-4 w-4 rounded border-[#DDDDDD] accent-[#FF6B00] cursor-pointer"
+              />
+              <span className="text-sm text-[#444444] leading-snug">
+                I agree to the{' '}
+                <Link href="/terms" target="_blank" className="text-[#FF6B00] hover:text-[#E85F00] transition-colors">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" target="_blank" className="text-[#FF6B00] hover:text-[#E85F00] transition-colors">
+                  Privacy Policy
+                </Link>
+              </span>
+            </label>
+            {termsError && (
+              <p className="text-xs text-[#DC2626] mt-1.5 ml-6.5">
+                Please accept the Terms of Service and Privacy Policy to continue.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* CTA */}
         {!isProcessing && (
-          <div className="mt-8">
+          <div className="mt-4">
             <Button
               variant="primary"
               size="lg"
@@ -333,6 +372,17 @@ export default function UploadPage() {
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-[#DDDDDD] py-6 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-center gap-2 text-sm text-[#999999]">
+          <span>&copy; 2026 CV Pulse</span>
+          <span>&middot;</span>
+          <Link href="/terms" className="hover:text-[#222222] transition-colors">Terms</Link>
+          <span>&middot;</span>
+          <Link href="/privacy" className="hover:text-[#222222] transition-colors">Privacy</Link>
+        </div>
+      </footer>
     </div>
   )
 }

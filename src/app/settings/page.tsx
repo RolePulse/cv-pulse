@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Header from '@/components/Header'
 import Button from '@/components/Button'
 import Modal from '@/components/Modal'
@@ -248,6 +249,17 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Modal>
+
+      {/* Footer */}
+      <footer className="border-t border-[#DDDDDD] py-6 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-center gap-2 text-sm text-[#999999]">
+          <span>&copy; 2026 CV Pulse</span>
+          <span>&middot;</span>
+          <Link href="/terms" className="hover:text-[#222222] transition-colors">Terms</Link>
+          <span>&middot;</span>
+          <Link href="/privacy" className="hover:text-[#222222] transition-colors">Privacy</Link>
+        </div>
+      </footer>
     </div>
   )
 }

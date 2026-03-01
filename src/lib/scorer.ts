@@ -255,8 +255,10 @@ function checkCriticalConcerns(
     })
   }
 
-  // 2. LinkedIn
-  const hasLinkedIn = lower.includes('linkedin.com/in/') || lower.includes('linkedin.com/pub/')
+  // 2. LinkedIn — broad check: any linkedin.com URL, /in/ path, or "linkedin" near a profile marker
+  const hasLinkedIn =
+    lower.includes('linkedin.com') ||
+    /linkedin\.com|linkedin\/in\/|\/in\/[\w-]{3,}/i.test(rawText)
   if (!hasLinkedIn) {
     concerns.push('No LinkedIn profile URL found')
     checklistItems.push({
@@ -322,6 +324,44 @@ function checkCriticalConcerns(
   return { concerns, checklistItems }
 }
 
+// ─── Helper: clean role label for checklist action text ──────────────────────
+// Handles garbled parser output: blank titles, bullets-as-titles, location strings,
+// numeric company fields, and pipe-separated noise.
+
+function cleanRoleLabel(title: string, company: string, index: number): string {
+  const ORDINALS = ['most recent', 'second', 'third']
+  const fallback = `your ${ORDINALS[index] ?? 'recent'} role`
+
+  // Sanitise title
+  const t = title.trim().replace(/^[•●▪▸\-\*]\s*/, '') // strip leading bullet chars
+  const isBadTitle =
+    !t ||
+    t.length > 80 ||            // too long — likely a parsed bullet
+    /\|/.test(t) ||             // contains pipe — garbled company+location in title field
+    /^\d/.test(t) ||            // starts with a digit — date/number artifact
+    /[.,;:]$/.test(t) ||        // ends with punctuation — sentence fragment, not a title
+    / - [A-Z][a-z]+ /.test(t) || // "- New York, NY" style location embedded in title
+    t.split(/\s+/).length > 9   // 10+ words — sentence, not a job title
+
+  // Sanitise company
+  const c = (company ?? '')
+    .trim()
+    .replace(/^[•●▪▸\-\*]\s*/, '')   // strip leading bullet chars
+    .replace(/\s*\|.*$/, '')           // strip "| City, State" or "| Job Title" suffix
+    .replace(/,\s*(LLC|Inc|Ltd|Corp|Co\.?)\s*$/i, '')
+    .trim()
+  const isBadCompany =
+    !c ||
+    c.length < 2 ||
+    /^\d+\/?$/.test(c) ||  // just a number like "11/"
+    c.length > 60
+
+  if (!isBadTitle && !isBadCompany) return `your ${t} role at ${c}`
+  if (!isBadTitle) return `your ${t} role`
+  if (!isBadCompany) return `your role at ${c}`
+  return fallback
+}
+
 // ─── Bucket 1: Proof of impact (max 35) ──────────────────────────────────────
 
 function scoreProofOfImpact(structured: StructuredCV): BucketResult & { checklistItems: ScorerChecklistItem[] } {
@@ -339,34 +379,36 @@ function scoreProofOfImpact(structured: StructuredCV): BucketResult & { checklis
         category: 'impact',
         action: 'Add your work experience with bullet points describing your achievements',
         whyItMatters: 'Without experience, there is nothing to score. Even 1 role with measurable results matters.',
-        potentialPoints: 35,
+        potentialPoints: 11,
         done: false,
       }],
     }
   }
 
   let totalPoints = 0
-  const pointsPerRole = Math.floor(35 / Math.min(3, recentRoles.length))
+  // Fixed points per role (based on 3-role ideal: 11×3 = 33, capped to 35).
+  // Using a fixed value prevents inflated single-item scores when a CV has only 1 role.
+  const POINTS_PER_ROLE = 11
 
   for (let i = 0; i < recentRoles.length; i++) {
     const role = recentRoles[i]
     const quantifiedBullets = role.bullets.filter(isQuantified)
     const count = quantifiedBullets.length
-    const roleLabel = `${role.title}${role.company ? ` at ${role.company}` : ''}`
+    const roleLabel = cleanRoleLabel(role.title, role.company, i)
 
     if (count >= 2) {
-      totalPoints += pointsPerRole
+      totalPoints += POINTS_PER_ROLE
       positives.push(`${roleLabel}: ${count} measurable results`)
     } else if (count === 1) {
-      const partial = Math.round(pointsPerRole * 0.4)
+      const partial = Math.round(POINTS_PER_ROLE * 0.4)
       totalPoints += partial
       issues.push(`${roleLabel}: only 1 measurable result (need 2+)`)
       checklistItems.push({
         id: `one-metric-role-${i}`,
         category: 'impact',
-        action: `Add 1 more measurable result to your ${roleLabel} role`,
+        action: `Add 1 more measurable result to ${roleLabel}`,
         whyItMatters: 'You have a metric here — one more transforms this into an achievements section rather than a list of responsibilities.',
-        potentialPoints: pointsPerRole - partial,
+        potentialPoints: POINTS_PER_ROLE - partial,
         done: false,
       })
     } else {
@@ -374,16 +416,16 @@ function scoreProofOfImpact(structured: StructuredCV): BucketResult & { checklis
       checklistItems.push({
         id: `no-metrics-role-${i}`,
         category: 'impact',
-        action: `Add 2+ measurable results to your ${roleLabel} role`,
+        action: `Add 2+ measurable results to ${roleLabel}`,
         whyItMatters: 'Recruiters scan for numbers first. Bullets without metrics are treated as responsibilities, not achievements — and responsibilities do not get callbacks.',
-        potentialPoints: pointsPerRole,
+        potentialPoints: POINTS_PER_ROLE,
         done: false,
       })
     }
   }
 
   // Bonus: if first role has 3+ quantified bullets, early visibility is strong
-  if (recentRoles[0]?.bullets.filter(isQuantified).length >= 3 && totalPoints >= pointsPerRole) {
+  if (recentRoles[0]?.bullets.filter(isQuantified).length >= 3 && totalPoints >= POINTS_PER_ROLE) {
     positives.push('Metrics appear early and prominently — strong first impression')
   }
 

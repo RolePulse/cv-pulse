@@ -255,10 +255,15 @@ function checkCriticalConcerns(
     })
   }
 
-  // 2. LinkedIn — broad check: any linkedin.com URL, /in/ path, or "linkedin" near a profile marker
+  // 2. LinkedIn — check for URL or standalone "linkedin" word in header area
+  // Many PDFs render LinkedIn as a clickable text label without extracting the full URL.
+  // We check: (a) linkedin.com URL anywhere, (b) /in/handle pattern,
+  // (c) "linkedin" as a word in the first 20 lines (header/contact area)
+  const headerText = rawText.split('\n').slice(0, 20).join('\n').toLowerCase()
   const hasLinkedIn =
     lower.includes('linkedin.com') ||
-    /linkedin\.com|linkedin\/in\/|\/in\/[\w-]{3,}/i.test(rawText)
+    /\/in\/[\w-]{3,}/i.test(rawText) ||
+    /\blinkedin\b/.test(headerText)
   if (!hasLinkedIn) {
     concerns.push('No LinkedIn profile URL found')
     checklistItems.push({

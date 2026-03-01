@@ -41,12 +41,20 @@ export function cleanText(raw: string): string {
   const lines = raw
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
+    // Null bytes in PDFs are often encoding artifacts for en-dashes (date ranges, salary ranges)
+    // Replace with en-dash so date parsers can find "05/2024 – Present" correctly
+    .replace(/\u0000/g, '–')
+    // Strip remaining control characters (leave \n alone — handled by split/join)
+    .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
     .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ')
     .split('\n')
     .map(collapseSpacedChars) // collapse "O C T O B E R" → "OCTOBER" per line
-  
+
   return lines
     .join('\n')
+    // Replace 8+ consecutive spaces with a newline — preserves two-column PDF layout
+    // where columns are space-padded on the same row (e.g. "COMPANY         LOCATION")
+    .replace(/ {8,}/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/ {2,}/g, ' ')
     .trim()
@@ -263,7 +271,12 @@ export function extractSkills(text: string): string[] {
   if (!text.trim()) return []
   return text
     .split(/[,|•\n·\/]/)
-    .map(s => s.replace(new RegExp(`^[\\-\\*\\s${BULLET_CHARS}]+`), '').trim())
+    .map(s => {
+      let skill = s.replace(new RegExp(`^[\\-\\*\\s${BULLET_CHARS}]+`), '').trim()
+      // Strip category label prefixes like "Languages: ", "Tools: ", "Methods: "
+      skill = skill.replace(/^[A-Za-z][A-Za-z\s&\/]{1,20}:\s+/, '')
+      return skill.trim()
+    })
     .filter(s => s.length >= 2 && s.length <= 60 && !/^\d+$/.test(s))
     .slice(0, 60)
 }

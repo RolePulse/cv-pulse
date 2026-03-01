@@ -7,6 +7,7 @@ import Button from '@/components/Button'
 import AlertBanner from '@/components/AlertBanner'
 import { createClient } from '@/lib/supabase/client'
 import type { JDMatchResult } from '@/lib/jdMatcher'
+import PaywallModal from '@/components/PaywallModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,7 @@ function JDMatchContent() {
   const [result, setResult] = useState<MatchResponse | null>(null)
   const [checksRemaining, setChecksRemaining] = useState<number | null>(null)
   const [isPaywalled, setIsPaywalled] = useState(false)
+  const [paywallOpen, setPaywallOpen] = useState(false)
   const [resolvedCvId, setResolvedCvId] = useState<string | null>(cvId)
 
   // If no cvId in URL, fetch the user's latest CV
@@ -182,7 +184,7 @@ function JDMatchContent() {
       if (!res.ok) {
         if (res.status === 402) {
           setIsPaywalled(true)
-          setError(data.message ?? 'Free JD checks used up. Upgrade to continue.')
+          setPaywallOpen(true)
           return
         }
         setError(data.error ?? 'Something went wrong — please try again.')
@@ -217,9 +219,15 @@ function JDMatchContent() {
           </p>
         )}
         {isPaywalled && (
-          <p className="text-center text-xs text-[#DC2626] mb-6 font-medium">
-            Free JD checks used up
-          </p>
+          <div className="text-center mb-6">
+            <p className="text-xs text-[#DC2626] font-medium mb-1">Free JD checks used up</p>
+            <button
+              onClick={() => setPaywallOpen(true)}
+              className="text-xs text-[#FF6B00] hover:underline font-medium"
+            >
+              Upgrade to unlock unlimited checks →
+            </button>
+          </div>
         )}
         {checksRemaining === null && !isPaywalled && <div className="mb-6" />}
 
@@ -274,11 +282,20 @@ function JDMatchContent() {
           >
             <div className="text-3xl mb-2">🔒</div>
             <p className="text-sm font-medium text-[#222222] mb-1">Free JD checks used up</p>
-            <p className="text-sm text-[#666666]">
+            <p className="text-sm text-[#666666] mb-4">
               You've used your 2 free JD checks. Upgrade to run unlimited checks.
             </p>
+            <Button variant="primary" size="sm" onClick={() => setPaywallOpen(true)}>
+              Upgrade — $9/month
+            </Button>
           </div>
         )}
+
+        <PaywallModal
+          isOpen={paywallOpen}
+          onClose={() => setPaywallOpen(false)}
+          action="jd_check"
+        />
       </main>
     </div>
   )

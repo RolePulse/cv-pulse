@@ -11,6 +11,7 @@ import type { StructuredCV, ExperienceRole, EducationEntry } from '@/types/datab
 import type { ScoreResult } from '@/lib/scorer'
 import { detectAvailableFixes, applyFix } from '@/lib/cvFixes'
 import type { AvailableFix } from '@/lib/cvFixes'
+import PaywallModal from '@/components/PaywallModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -422,6 +423,7 @@ function EditorContent() {
   const [totalItems, setTotalItems] = useState(0)
   const [lastEdited, setLastEdited] = useState<string | null>(null)
   const [availableFixes, setAvailableFixes] = useState<AvailableFix[]>([])
+  const [paywallOpen, setPaywallOpen] = useState(false)
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestCV = useRef<StructuredCV | null>(null)
@@ -526,6 +528,11 @@ function EditorContent() {
 
     try {
       const res = await fetch(`/api/cv/${cvId}/score`, { method: 'POST' })
+      if (res.status === 402) {
+        setPaywallOpen(true)
+        setIsRescoring(false)
+        return
+      }
       if (!res.ok) { setIsRescoring(false); return }
 
       const data = await res.json() as { result: ScoreResult }
@@ -778,6 +785,12 @@ function EditorContent() {
           </div>
         </div>
       </div>
+
+      <PaywallModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        action="rescore"
+      />
     </main>
   )
 }

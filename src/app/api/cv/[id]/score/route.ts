@@ -1,5 +1,6 @@
 // CV Pulse — Score API
 // Epic 4 | POST /api/cv/[id]/score — runs deterministic scoring engine, saves to DB
+// Epic 10 | Usage gate: first score for a CV is always free. Re-score #2+ is gated.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -44,6 +45,45 @@ export async function POST(
 
   if (!cv.structured_json || !cv.raw_text) {
     return NextResponse.json({ error: 'CV has no parseable content' }, { status: 400 })
+  }
+
+  // ── Usage gate (Epic 10) ──────────────────────────────────────────────────
+  // First score for a CV is always free (no usage deducted).
+  // Re-score #2+ is gated for free users (free_rescores_used >= 1).
+  const { count: existingScoreCount } = await supabase
+    .from('scores')
+    .select('id', { count: 'exact', head: true })
+    .eq('cv_id', id)
+
+  const isFirstScore = (existingScoreCount ?? 0) === 0
+
+  if (!isFirstScore) {
+    const { data: usage } = await supabase
+      .from('usage')
+      .select('free_rescores_used, paid_status')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const isPaid = usage?.paid_status !== 'free'
+    const rescoresUsed = usage?.free_rescores_used ?? 0
+
+    if (!isPaid && rescoresUsed >= 1) {
+      // Log paywall hit event
+      await supabase.from('events').insert({
+        event_name: 'paywall_hit',
+        user_id: user.id,
+        meta_json: { action: 'rescore', cv_id: id, rescores_used: rescoresUsed },
+      })
+      return NextResponse.json(
+        {
+          error: 'paywall',
+          rescoresUsed,
+          rescoresRemaining: 0,
+          message: "You've used your 1 free re-score. Upgrade to unlock unlimited re-scores.",
+        },
+        { status: 402 }
+      )
+    }
   }
 
   // ── Score ─────────────────────────────────────────────────────────────────
@@ -95,9 +135,18 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to save score — please try again' }, { status: 500 })
   }
 
+  // ── Increment usage for re-scores (not first score) (Epic 10) ───────────
+  // Uses the increment_usage RPC for atomic increment (no race conditions)
+  if (!isFirstScore) {
+    await supabase.rpc('increment_usage', {
+      p_user_id: user.id,
+      p_field: 'free_rescores_used',
+    })
+  }
+
   // ── Log event ─────────────────────────────────────────────────────────────
   await supabase.from('events').insert({
-    event_name: 'cv_scored',
+    event_name: isFirstScore ? 'cv_scored' : 'cv_rescored',
     user_id: user.id,
     meta_json: {
       cv_id: id,
@@ -105,6 +154,7 @@ export async function POST(
       overall_score: result.overallScore,
       pass_fail: result.passFail,
       target_role: cv.target_role,
+      is_first_score: isFirstScore,
     },
   })
 

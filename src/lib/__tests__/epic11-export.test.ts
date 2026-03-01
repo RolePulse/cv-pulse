@@ -139,17 +139,31 @@ describe('Epic 11 — PDF Export', () => {
 
 })
 
-// ─── Real CV smoke tests ───────────────────────────────────────────────────────
+// ─── Real CV export tests — all CVs in Downloads ─────────────────────────────
 
 const CV_DIR = path.join(process.env.HOME ?? '/Users/jamesfowles', 'Downloads')
 
-// Subset of real CVs for smoke testing (use a representative sample)
-const SMOKE_CVS = [
-  'Nicholas M Goerg Resume  (3) (1).pdf',  // AE — scores ~70, has good structure
-  'Ashley Taggart Resume.pdf',              // fallback SDR
-  'Bryson_Ward_Resume.pdf',                 // SDR fallback, multiple roles
-  '0Resumes Thomas D Dievart resume.pdf',   // Marketing — multi-role
-  'Kati Smith Resume.pdf',                  // two-column, known parse limit
+const ALL_CVS = [
+  'Claire F Resume 2025.pdf',
+  'Emily Shea - CV - 2025.pdf.pdf',
+  'Mariah_Cooper_CV_2025.pdf',
+  'Ashley Taggart Resume.pdf',
+  'George Samayoa CV.pdf',
+  '0Resumes Thomas D Dievart resume.pdf',
+  'Bryson_Ward_Resume.pdf',
+  'Katie Resume 2025.pdf',
+  'Joe Guay Resume 2025.pdf',
+  'Kati Smith Resume.pdf',
+  'Nicholas M Goerg Resume  (3) (1).pdf',
+  'Sophia Nguyen Resume 2025.pdf',
+  'Resume-EveForaker.pdf',
+  'Kit Lewis - Resume.pdf',
+  'Erin Woods Resume (1).pdf',
+  'Anthony Bryan Allen Resume 3.5.pdf',
+  'MaxDalzielResume - 040925.pdf',
+  'LauraManoleResume.pdf',
+  'Florence Aouad Resume (1).pdf',
+  'PiyushP_ResumeWPassword.pdf',
 ]
 
 async function extractText(filePath: string): Promise<string | null> {
@@ -162,43 +176,133 @@ async function extractText(filePath: string): Promise<string | null> {
   }
 }
 
-describe('Epic 11 — Real CV PDF export smoke tests', () => {
-  for (const filename of SMOKE_CVS) {
-    it(`Generates both templates for: ${filename}`, async () => {
+interface ExportResult {
+  name: string
+  skipped: boolean
+  skipReason?: string
+  roles: number
+  classicKB: number
+  modernKB: number
+  classicValid: boolean
+  modernValid: boolean
+  errors: string[]
+}
+
+const exportResults: ExportResult[] = []
+
+describe('Epic 11 — Real CV PDF export — all CVs in Downloads', () => {
+
+  for (const filename of ALL_CVS) {
+    it(`Both templates: ${filename}`, async () => {
       const filePath = path.join(CV_DIR, filename)
+      const result: ExportResult = {
+        name: filename,
+        skipped: false,
+        roles: 0,
+        classicKB: 0,
+        modernKB: 0,
+        classicValid: false,
+        modernValid: false,
+        errors: [],
+      }
 
       if (!existsSync(filePath)) {
-        console.log(`  ⏭ ${filename} — not found, skipping`)
+        result.skipped = true
+        result.skipReason = 'File not found'
+        exportResults.push(result)
+        console.log(`  ⏭ ${filename} — not found`)
         return
       }
 
       const rawText = await extractText(filePath)
       if (!rawText || rawText.trim().length < 100) {
-        console.log(`  ⏭ ${filename} — too short to parse, skipping`)
+        result.skipped = true
+        result.skipReason = rawText === null ? 'Password-protected or corrupt' : 'Too short to parse'
+        exportResults.push(result)
+        console.log(`  ⏭ ${filename} — ${result.skipReason}`)
         return
       }
 
-      const parsed = parseText(rawText)
-      const structured = parsed.structured as StructuredCV
+      let parsed: ReturnType<typeof parseText>
+      try {
+        parsed = parseText(rawText)
+      } catch (e) {
+        result.errors.push(`parseText crashed: ${String(e)}`)
+        exportResults.push(result)
+        throw e
+      }
 
-      // Both templates must generate without crashing
-      const [classic, modern] = await Promise.all([
-        generatePDF(structured, rawText, 'classic'),
-        generatePDF(structured, rawText, 'modern'),
-      ])
+      result.roles = parsed.structured.experience?.length ?? 0
 
-      // Both must be non-empty valid PDFs
+      let classic: Buffer
+      let modern: Buffer
+      try {
+        ;[classic, modern] = await Promise.all([
+          generatePDF(parsed.structured as StructuredCV, rawText, 'classic'),
+          generatePDF(parsed.structured as StructuredCV, rawText, 'modern'),
+        ])
+      } catch (e) {
+        result.errors.push(`generatePDF crashed: ${String(e)}`)
+        exportResults.push(result)
+        throw e
+      }
+
+      result.classicKB = Math.round(classic.byteLength / 1024)
+      result.modernKB = Math.round(modern.byteLength / 1024)
+      result.classicValid = classic.slice(0, 5).toString() === '%PDF-'
+      result.modernValid = modern.slice(0, 5).toString() === '%PDF-'
+
+      exportResults.push(result)
+
+      const icon = result.classicValid && result.modernValid ? '✅' : '❌'
+      console.log(
+        `  ${icon} ${filename.replace('.pdf', '')}\n` +
+        `     classic=${result.classicKB}KB modern=${result.modernKB}KB | roles=${result.roles}`
+      )
+
+      // Assertions
       expect(classic.byteLength).toBeGreaterThan(500)
       expect(modern.byteLength).toBeGreaterThan(500)
-      expect(Buffer.from(classic.slice(0, 5)).toString('ascii')).toBe('%PDF-')
-      expect(Buffer.from(modern.slice(0, 5)).toString('ascii')).toBe('%PDF-')
-
-      const classicKB = Math.round(classic.byteLength / 1024)
-      const modernKB = Math.round(modern.byteLength / 1024)
-      console.log(
-        `  ✅ ${filename.replace('.pdf', '')}\n` +
-        `     classic=${classicKB}KB modern=${modernKB}KB | roles=${parsed.structured.experience?.length ?? 0}`
-      )
+      expect(result.classicValid).toBe(true)
+      expect(result.modernValid).toBe(true)
+      expect(result.errors).toHaveLength(0)
     })
   }
+
+  it('prints export summary', () => {
+    const processed = exportResults.filter((r) => !r.skipped)
+    const skipped = exportResults.filter((r) => r.skipped)
+    const allValid = processed.filter((r) => r.classicValid && r.modernValid)
+
+    const avgClassicKB = processed.length
+      ? Math.round(processed.reduce((s, r) => s + r.classicKB, 0) / processed.length)
+      : 0
+    const avgModernKB = processed.length
+      ? Math.round(processed.reduce((s, r) => s + r.modernKB, 0) / processed.length)
+      : 0
+    const avgRoles = processed.length
+      ? Math.round(processed.reduce((s, r) => s + r.roles, 0) / processed.length * 10) / 10
+      : 0
+
+    console.log('\n──────────── PDF EXPORT SUMMARY ────────────')
+    console.log(`CVs processed:  ${processed.length} / ${ALL_CVS.length} (${skipped.length} skipped)`)
+    console.log(`Valid PDFs:     ${allValid.length}/${processed.length} (both templates)`)
+    console.log(`Avg file size:  Classic ${avgClassicKB}KB · Modern ${avgModernKB}KB`)
+    console.log(`Avg roles:      ${avgRoles} per CV`)
+
+    const byRoles = processed.reduce((acc, r) => {
+      const bucket = r.roles === 0 ? '0 roles' : r.roles <= 2 ? '1–2 roles' : r.roles <= 4 ? '3–4 roles' : '5+ roles'
+      acc[bucket] = (acc[bucket] ?? 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+
+    console.log('\nRoles per CV:')
+    for (const [bucket, count] of Object.entries(byRoles)) {
+      console.log(`  ${bucket}: ${count} CV(s)`)
+    }
+    console.log('─────────────────────────────────────────────\n')
+
+    expect(processed.length).toBeGreaterThan(0)
+    expect(allValid.length).toBe(processed.length)
+  })
 })

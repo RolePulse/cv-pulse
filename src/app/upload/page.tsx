@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/Header'
 import ProgressIndicator from '@/components/ProgressIndicator'
@@ -23,6 +23,7 @@ const STEP_ORDER: UploadStep[] = ['parsing', 'structuring', 'validating', 'ready
 
 export default function UploadPage() {
   const router = useRouter()
+  const [deletedBanner, setDeletedBanner] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [showPaste, setShowPaste] = useState(false)
@@ -30,6 +31,16 @@ export default function UploadPage() {
   const [step, setStep] = useState<UploadStep>('idle')
   const [error, setError] = useState<string | null>(null)
   const [gateReason, setGateReason] = useState<string | null>(null)
+
+  // Show banner when redirected after CV deletion
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('deleted') === 'cv') {
+      setDeletedBanner(true)
+      // Remove query param from URL so refresh does not re-show it
+      window.history.replaceState({}, '', '/upload')
+    }
+  }, [])
 
   const hasContent = !!file || pasteText.trim().length > 100
   const isProcessing = ['parsing', 'structuring', 'validating', 'ready'].includes(step)
@@ -172,6 +183,17 @@ export default function UploadPage() {
         <p className="text-[#444444] text-center mb-8 text-sm">
           We&apos;ll score it against your target role and show you exactly what to fix.
         </p>
+
+        {/* CV deleted success banner */}
+        {deletedBanner && (
+          <div className="mb-6">
+            <AlertBanner
+              type="success"
+              message="Your CV and scores have been deleted. Upload a new one to get started."
+              onDismiss={() => setDeletedBanner(false)}
+            />
+          </div>
+        )}
 
         {/* Error banner */}
         {error && (

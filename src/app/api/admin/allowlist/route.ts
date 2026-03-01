@@ -23,8 +23,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Sign in required' }, { status: 401 })
   }
 
-  // Basic admin guard — full admin role check in Epic 15
-  if (ADMIN_EMAIL && user.email !== ADMIN_EMAIL) {
+  // Admin guard — fail safe if ADMIN_EMAIL not set
+  if (!ADMIN_EMAIL || user.email !== ADMIN_EMAIL) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
   }
 

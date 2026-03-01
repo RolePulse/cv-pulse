@@ -31,6 +31,13 @@ export async function DELETE() {
 
   const cvIds = (cvs ?? []).map((cv: { id: string }) => cv.id)
 
+  // ── Log account deletion event before deleting ───────────────────────────
+  await supabase.from('events').insert({
+    event_name: 'account_deleted',
+    user_id: user.id,
+    meta_json: { email: dbUser?.email ?? null, cv_count: cvIds.length },
+  })
+
   // ── Delete in foreign-key safe order ──────────────────────────────────────
   await deleteAccountData(supabase, user.id, dbUser?.email ?? null, cvIds)
 

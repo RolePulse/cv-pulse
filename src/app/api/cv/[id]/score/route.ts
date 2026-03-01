@@ -131,10 +131,10 @@ export async function GET(
     return NextResponse.json({ error: 'Sign in required' }, { status: 401 })
   }
 
-  // Verify ownership
+  // Verify ownership + get lastEdited timestamp
   const { data: cv } = await supabase
     .from('cvs')
-    .select('id, target_role, structured_json, raw_text')
+    .select('id, target_role, structured_json, raw_text, updated_at')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
@@ -143,29 +143,36 @@ export async function GET(
     return NextResponse.json({ error: 'CV not found' }, { status: 404 })
   }
 
-  // Get latest score
-  const { data: score } = await supabase
+  // Fetch ALL scores ordered ascending — gives us first (initial) and last (latest)
+  const { data: allScores } = await supabase
     .from('scores')
-    .select('*')
+    .select('id, overall_score, pass_fail, bucket_scores_json, penalties_json, checklist_json, created_at')
     .eq('cv_id', id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
+    .order('created_at', { ascending: true })
 
-  if (!score) {
+  if (!allScores || allScores.length === 0) {
     return NextResponse.json({ hasScore: false })
   }
+
+  const firstScore = allScores[0]
+  const latestScore = allScores[allScores.length - 1]
+  const checklist = (latestScore.checklist_json ?? []) as Array<{ done: boolean }>
 
   return NextResponse.json({
     hasScore: true,
     score: {
-      id: score.id,
-      overallScore: score.overall_score,
-      passFail: score.pass_fail,
-      bucketScores: score.bucket_scores_json,
-      penalties: score.penalties_json,
-      checklist: score.checklist_json,
-      createdAt: score.created_at,
+      id: latestScore.id,
+      overallScore: latestScore.overall_score,
+      passFail: latestScore.pass_fail,
+      bucketScores: latestScore.bucket_scores_json,
+      penalties: latestScore.penalties_json,
+      checklist: latestScore.checklist_json,
+      createdAt: latestScore.created_at,
     },
+    // Score history data for the editor sidebar
+    initialScore: firstScore.overall_score,
+    resolvedCount: checklist.filter((i) => i.done).length,
+    totalItems: checklist.length,
+    lastEdited: (cv as { updated_at: string }).updated_at,
   })
 }

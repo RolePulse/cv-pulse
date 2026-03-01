@@ -8,6 +8,7 @@ import Button from '@/components/Button'
 import AlertBanner from '@/components/AlertBanner'
 import { createClient } from '@/lib/supabase/client'
 import type { StructuredCV, ExperienceRole, EducationEntry } from '@/types/database'
+import type { ScoreResult } from '@/lib/scorer'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -191,20 +192,96 @@ function RoleCard({
   )
 }
 
+// ── Score history strip ───────────────────────────────────────────────────────
+
+function ScoreHistoryStrip({
+  initialScore,
+  currentScore,
+  resolvedCount,
+  totalItems,
+  lastEdited,
+  passFail,
+}: {
+  initialScore: number | null
+  currentScore: number | null
+  resolvedCount: number
+  totalItems: number
+  lastEdited: string | null
+  passFail: boolean | null
+}) {
+  if (currentScore === null) return null
+
+  const improved = initialScore !== null && initialScore !== currentScore
+  const editedTime = lastEdited
+    ? new Date(lastEdited).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : null
+
+  return (
+    <div className="bg-[#F9F4F0] rounded-[6px] px-4 py-3 mb-4 space-y-2 text-xs">
+      {/* Score trend */}
+      <div className="flex items-center justify-between">
+        <span className="text-[#888888]">Score</span>
+        <span className="font-semibold text-[#222222]">
+          {improved ? `${initialScore} → ${currentScore}` : `${currentScore}`}
+          <span className="font-normal text-[#999999]">/100</span>
+        </span>
+      </div>
+
+      {/* Items resolved */}
+      {totalItems > 0 && (
+        <div className="flex items-center justify-between">
+          <span className="text-[#888888]">Fixed</span>
+          <span className={resolvedCount > 0 ? 'font-medium text-[#16A34A]' : 'text-[#AAAAAA]'}>
+            {resolvedCount} of {totalItems}
+          </span>
+        </div>
+      )}
+
+      {/* Pass/fail badge */}
+      <div className="flex items-center justify-between">
+        <span className="text-[#888888]">Status</span>
+        <span className={[
+          'font-semibold px-2 py-0.5 rounded-full',
+          passFail ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600',
+        ].join(' ')}>
+          {passFail ? 'Pass ✓' : 'Needs work'}
+        </span>
+      </div>
+
+      {/* Last edited */}
+      {editedTime && (
+        <div className="flex items-center justify-between">
+          <span className="text-[#888888]">Saved</span>
+          <span className="text-[#AAAAAA]">{editedTime}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Checklist sidebar ─────────────────────────────────────────────────────────
 
 function ChecklistSidebar({
   items,
   score,
-  cvId,
   onRescore,
+  isRescoring,
+  initialScore,
+  resolvedCount,
+  totalItems,
+  lastEdited,
+  passFail,
 }: {
   items: ChecklistItem[]
   score: number | null
-  cvId: string
   onRescore: () => void
+  isRescoring: boolean
+  initialScore: number | null
+  resolvedCount: number
+  totalItems: number
+  lastEdited: string | null
+  passFail: boolean | null
 }) {
-  const router = useRouter()
   const todo = items.filter((i) => !i.done)
   const done = items.filter((i) => i.done)
 
@@ -213,18 +290,21 @@ function ChecklistSidebar({
       className="bg-white rounded-[8px] border border-[#DDDDDD] p-5 sticky top-20"
       style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
     >
-      {score !== null && (
-        <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#F0F0F0]">
-          <span className="text-sm text-[#666666]">Current score</span>
-          <span className="text-2xl font-bold text-[#222222]">{score}<span className="text-sm font-normal text-[#999999]">/100</span></span>
-        </div>
-      )}
+      {/* Score history strip */}
+      <ScoreHistoryStrip
+        initialScore={initialScore}
+        currentScore={score}
+        resolvedCount={resolvedCount}
+        totalItems={totalItems}
+        lastEdited={lastEdited}
+        passFail={passFail}
+      />
 
       <h3 className="text-[13px] font-semibold text-[#222222] mb-3">
         Fixes remaining ({todo.length})
       </h3>
 
-      <div className="space-y-2 mb-4 max-h-80 overflow-y-auto">
+      <div className="space-y-2 mb-4 max-h-72 overflow-y-auto">
         {todo.slice(0, 8).map((item) => (
           <div key={item.id} className="flex items-start gap-2">
             <span className={[
@@ -256,9 +336,15 @@ function ChecklistSidebar({
         variant="primary"
         size="sm"
         className="w-full justify-center"
-        onClick={() => router.push(`/results?cvId=${cvId}`)}
+        onClick={onRescore}
+        disabled={isRescoring}
       >
-        Re-score →
+        {isRescoring ? (
+          <span className="flex items-center gap-2">
+            <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            Scoring…
+          </span>
+        ) : 'Re-score →'}
       </Button>
 
       <p className="text-[10px] text-[#BBBBBB] text-center mt-2">Saves automatically before re-scoring</p>
@@ -292,6 +378,12 @@ function EditorContent() {
   const [error, setError] = useState<string | null>(null)
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [score, setScore] = useState<number | null>(null)
+  const [passFail, setPassFail] = useState<boolean | null>(null)
+  const [isRescoring, setIsRescoring] = useState(false)
+  const [initialScore, setInitialScore] = useState<number | null>(null)
+  const [resolvedCount, setResolvedCount] = useState(0)
+  const [totalItems, setTotalItems] = useState(0)
+  const [lastEdited, setLastEdited] = useState<string | null>(null)
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestCV = useRef<StructuredCV | null>(null)
@@ -322,7 +414,12 @@ function EditorContent() {
         const scoreData = await scoreRes.json()
         if (scoreData.hasScore) {
           setScore(scoreData.score.overallScore)
+          setPassFail(scoreData.score.passFail ?? null)
           setChecklist(scoreData.score.checklist ?? [])
+          setInitialScore(scoreData.initialScore ?? scoreData.score.overallScore)
+          setResolvedCount(scoreData.resolvedCount ?? 0)
+          setTotalItems(scoreData.totalItems ?? 0)
+          setLastEdited(scoreData.lastEdited ?? null)
         }
       }
 
@@ -352,6 +449,66 @@ function EditorContent() {
       }
     }, 800)
   }, [cvId])
+
+  // ── Flush pending save immediately (used before re-score) ────────────────
+  const flushSave = useCallback(async (): Promise<boolean> => {
+    if (!cvId || !latestCV.current) return true
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+    setSaveStatus('saving')
+    try {
+      const res = await fetch(`/api/cv/${cvId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ structured: latestCV.current }),
+      })
+      setSaveStatus(res.ok ? 'saved' : 'error')
+      setTimeout(() => setSaveStatus('idle'), 2500)
+      return res.ok
+    } catch {
+      setSaveStatus('error')
+      return false
+    }
+  }, [cvId])
+
+  // ── In-editor re-score ────────────────────────────────────────────────────
+  const handleRescore = useCallback(async () => {
+    if (!cvId || isRescoring) return
+    setIsRescoring(true)
+
+    // Flush any pending auto-save before scoring
+    await flushSave()
+
+    try {
+      const res = await fetch(`/api/cv/${cvId}/score`, { method: 'POST' })
+      if (!res.ok) { setIsRescoring(false); return }
+
+      const data = await res.json() as { result: ScoreResult }
+
+      const newChecklist: ChecklistItem[] = data.result.checklist.map((item) => ({
+        id: item.id,
+        category: item.category,
+        action: item.action,
+        potentialPoints: item.potentialPoints,
+        done: item.done,
+      }))
+
+      const resolved = newChecklist.filter((i) => i.done).length
+
+      setScore(data.result.overallScore)
+      setPassFail(data.result.passFail)
+      setChecklist(newChecklist)
+      setResolvedCount(resolved)
+      setTotalItems(newChecklist.length)
+      setLastEdited(new Date().toISOString())
+    } catch {
+      // Fail silently — score stays as-is
+    } finally {
+      setIsRescoring(false)
+    }
+  }, [cvId, isRescoring, flushSave])
 
   // ── CV field updaters ─────────────────────────────────────────────────────
   const updateSummary = (summary: string) => {
@@ -526,9 +683,15 @@ function EditorContent() {
                 variant="primary"
                 size="md"
                 className="flex-1 justify-center"
-                onClick={() => router.push(`/results?cvId=${cvId}`)}
+                onClick={handleRescore}
+                disabled={isRescoring}
               >
-                Re-score my CV →
+                {isRescoring ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Scoring…
+                  </span>
+                ) : 'Re-score my CV →'}
               </Button>
               <Button
                 variant="secondary"
@@ -547,8 +710,13 @@ function EditorContent() {
               <ChecklistSidebar
                 items={checklist}
                 score={score}
-                cvId={cvId}
-                onRescore={() => router.push(`/results?cvId=${cvId}`)}
+                onRescore={handleRescore}
+                isRescoring={isRescoring}
+                initialScore={initialScore}
+                resolvedCount={resolvedCount}
+                totalItems={totalItems}
+                lastEdited={lastEdited}
+                passFail={passFail}
               />
             )}
           </div>

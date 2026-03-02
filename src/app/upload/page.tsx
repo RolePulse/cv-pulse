@@ -91,37 +91,16 @@ export default function UploadPage() {
     }
   }
 
-  // Simulate processing step progression with delays
-  async function animateSteps(onDone: () => void) {
+  // Run animation steps (purely visual — does not gate the result)
+  async function animateSteps() {
     for (const s of STEP_ORDER.slice(0, 3)) {
       setStep(s)
       await sleep(700)
     }
-    onDone()
   }
 
-  async function handleSubmit() {
-    if (!hasContent || isProcessing) return
-
-    if (!termsAccepted) {
-      setTermsError(true)
-      return
-    }
-
-    setError(null)
-    setGateReason(null)
-    setTermsError(false)
-
-    // Start animation alongside actual fetch
-    let fetchDone = false
-    let fetchResult: { ok: boolean; cvId?: string; confidence?: number; failReason?: string; error?: string } | null = null
-
-    // Kick off animation
-    animateSteps(() => {
-      if (fetchDone && fetchResult) handleResult(fetchResult)
-    })
-
-    // Kick off actual upload
+  // Perform the actual upload fetch and return a result object
+  async function doUpload(): Promise<{ ok: boolean; cvId?: string; confidence?: number; failReason?: string; error?: string; _netError?: boolean; _authError?: boolean; _parseError?: boolean }> {
     let response: Response
     try {
       if (file) {
@@ -136,34 +115,52 @@ export default function UploadPage() {
         })
       }
     } catch {
+      return { ok: false, _netError: true }
+    }
+
+    if (response.status === 401) return { ok: false, _authError: true }
+
+    try {
+      return await response.json()
+    } catch {
+      return { ok: false, _parseError: true }
+    }
+  }
+
+  async function handleSubmit() {
+    if (!hasContent || isProcessing) return
+
+    if (!termsAccepted) {
+      setTermsError(true)
+      return
+    }
+
+    setError(null)
+    setGateReason(null)
+    setTermsError(false)
+
+    // Run animation and fetch in parallel — wait for BOTH before showing result.
+    // This ensures the loading UI always completes its sequence (good UX) and the
+    // result is always handled regardless of how long the fetch takes.
+    const [data] = await Promise.all([doUpload(), animateSteps()])
+
+    if (data._netError) {
       setStep('failed')
       setError('Network error — check your connection and try again.')
       return
     }
-
-    if (response.status === 401) {
+    if (data._authError) {
       setStep('failed')
       setError('You need to sign in before uploading your CV.')
       return
     }
-
-    let data: typeof fetchResult
-    try {
-      data = await response.json()
-    } catch {
+    if (data._parseError) {
       setStep('failed')
       setError('Unexpected response from the server — please try again.')
       return
     }
 
-    fetchDone = true
-    fetchResult = data
-
-    // If animation has already completed, handle result immediately
-    if (step === 'ready' || step === 'failed' || step === 'gate_failed') {
-      handleResult(fetchResult!)
-    }
-    // Otherwise the animateSteps callback will call handleResult when done
+    handleResult(data)
   }
 
   function handleResult(data: { ok: boolean; cvId?: string; failReason?: string; error?: string }) {

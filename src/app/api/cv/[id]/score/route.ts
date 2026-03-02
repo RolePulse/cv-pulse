@@ -10,7 +10,7 @@ import type { TargetRole } from '@/lib/roleDetect'
 import { ALL_ROLES } from '@/lib/roleDetect'
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
@@ -47,9 +47,13 @@ export async function POST(
     return NextResponse.json({ error: 'CV has no parseable content' }, { status: 400 })
   }
 
-  // ── Usage gate (Epic 10) ──────────────────────────────────────────────────
-  // First score for a CV is always free (no usage deducted).
-  // Re-score #2+ is gated for free users (free_rescores_used >= 1).
+  // ── Determine if this is a forced re-score (from editor) or initial view ──
+  // The results page calls POST to generate/view a score.
+  // The editor calls POST with X-Force-Rescore: true when the user explicitly re-scores.
+  // Only forced re-scores count against the usage limit and create a new score row.
+  const forceRescore = request.headers.get('x-force-rescore') === 'true'
+
+  // ── Check if a score already exists ──────────────────────────────────────
   const { count: existingScoreCount } = await supabase
     .from('scores')
     .select('id', { count: 'exact', head: true })
@@ -57,7 +61,24 @@ export async function POST(
 
   const isFirstScore = (existingScoreCount ?? 0) === 0
 
-  if (!isFirstScore) {
+  // ── Usage gate (Epic 10) ──────────────────────────────────────────────────
+  // Rules:
+  // - First score ever: always free, always creates a DB row.
+  // - Subsequent view (no force flag): re-run scoring in memory, return result.
+  //   NO new DB row, NO usage increment. Idempotent — just viewing results.
+  // - Forced re-score (force flag): gated for free users, creates new DB row,
+  //   increments free_rescores_used. This is the intentional "re-score" action.
+  if (!isFirstScore && !forceRescore) {
+    // Idempotent view — re-run scoring in memory, return without touching DB
+    const result = scoreCV(
+      cv.structured_json as StructuredCV,
+      cv.raw_text,
+      cv.target_role as TargetRole,
+    )
+    return NextResponse.json({ ok: true, scoreId: null, result })
+  }
+
+  if (!isFirstScore && forceRescore) {
     const { data: usage } = await supabase
       .from('usage')
       .select('free_rescores_used, paid_status')
@@ -135,9 +156,9 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to save score — please try again' }, { status: 500 })
   }
 
-  // ── Increment usage for re-scores (not first score) (Epic 10) ───────────
+  // ── Increment usage for explicit re-scores (Epic 10) ─────────────────────
   // Uses the increment_usage RPC for atomic increment (no race conditions)
-  if (!isFirstScore) {
+  if (!isFirstScore && forceRescore) {
     await supabase.rpc('increment_usage', {
       p_user_id: user.id,
       p_field: 'free_rescores_used',

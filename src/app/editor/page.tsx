@@ -527,7 +527,10 @@ function EditorContent() {
     await flushSave()
 
     try {
-      const res = await fetch(`/api/cv/${cvId}/score`, { method: 'POST' })
+      const res = await fetch(`/api/cv/${cvId}/score`, {
+        method: 'POST',
+        headers: { 'x-force-rescore': 'true' },
+      })
       if (res.status === 402) {
         setPaywallOpen(true)
         setIsRescoring(false)

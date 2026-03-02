@@ -109,6 +109,25 @@ const ROLE_SIGNALS: Record<TargetRole, string[]> = {
   Leadership: ['vp', 'director', 'head of', 'chief', 'vice president', 'leadership', 'revenue leader'],
 }
 
+// ─── Role-specific example strings for checklist action copy ─────────────────
+// Used in checklist items to show a relevant example rather than a generic one.
+
+const ROLE_TITLE_EXAMPLES: Record<TargetRole, string> = {
+  SDR:        'SDR | SaaS | Outbound Specialist',
+  AE:         'Account Executive | SaaS | EMEA',
+  CSM:        'Customer Success Manager | SaaS | Retention',
+  Marketing:  'Demand Generation Manager | B2B SaaS | Growth',
+  Leadership: 'VP Sales | SaaS | Revenue Growth',
+}
+
+const ROLE_SUMMARY_EXAMPLES: Record<TargetRole, string> = {
+  SDR:        'SDR | Pipeline Generation | Outbound',
+  AE:         'Account Executive | New Business | SaaS',
+  CSM:        'Customer Success Manager | Retention | SaaS',
+  Marketing:  'Marketing Manager | Demand Generation | B2B SaaS',
+  Leadership: 'VP Sales | Revenue Growth | SaaS',
+}
+
 // ─── Helper: is a bullet quantified? ─────────────────────────────────────────
 
 const METRIC_PATTERNS = [
@@ -569,7 +588,7 @@ function scoreATSKeywords(
     checklistItems.push({
       id: 'title-mismatch',
       category: 'ats',
-      action: 'Add role-specific keywords to your most recent job title or summary (e.g. "Account Executive | SaaS | EMEA")',
+      action: `Add role-specific keywords to your most recent job title or summary (e.g. "${ROLE_TITLE_EXAMPLES[targetRole]}")`,
       whyItMatters: 'Recruiters scan job titles first. A title that signals the wrong role reduces your callback rate.',
       potentialPoints: 2,
       done: titleMatch,
@@ -767,7 +786,7 @@ function scoreClarity(
     checklistItems.push({
       id: 'role-not-clear',
       category: 'clarity',
-      action: 'Make your target role explicit in your summary and/or most recent title (e.g. "Customer Success Manager | SaaS | Retention")',
+      action: `Make your target role explicit in your summary and/or most recent title (e.g. "${ROLE_SUMMARY_EXAMPLES[targetRole]}")`,
       whyItMatters: 'Recruiters stack-rank applications. If your role is not obvious within 2 seconds, you are ranked below candidates who make it clear.',
       potentialPoints: 5,
       done: inTitle && inSummary,

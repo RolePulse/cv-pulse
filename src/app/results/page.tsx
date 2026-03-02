@@ -312,7 +312,11 @@ function ResultsContent() {
                 ? 'Your CV passes our recruiter threshold. Fixing the items below will push your score higher.'
                 : criticalConcerns.length > 0
                 ? 'Your CV has critical concerns that override the numeric score. Fix these first.'
-                : 'Your CV is close — fix the top items below to reach the 70-point pass mark.'}
+                : overallScore >= 55
+                ? 'Your CV is close — fix the top items below to reach the 70-point pass mark.'
+                : overallScore >= 40
+                ? 'Your CV needs work — tackle the fixes below to reach the 70-point pass mark.'
+                : 'Your CV needs significant work to reach the 70-point pass mark. Start with the top fixes below.'}
             </p>
           </div>
         </div>

@@ -51,7 +51,15 @@ export function isShareExpired(expiresAt: string | null, now: Date = new Date())
 
 /**
  * Build the public share URL from a token.
+ *
+ * Resolution order:
+ *   1. NEXT_PUBLIC_BASE_URL   — explicitly configured (preferred)
+ *   2. VERCEL_URL             — automatically set by Vercel on every deployment
+ *   3. https://cvpulse.io     — production fallback
  */
 export function buildShareUrl(token: string): string {
-  return `https://cvpulse.io/share/${token}`
+  const base =
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://cvpulse.io')
+  return `${base}/share/${token}`
 }

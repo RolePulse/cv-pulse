@@ -59,7 +59,7 @@ export default async function SharePage({ params }: SharePageProps) {
             <p className="text-sm text-[#666666] mb-6">
               Share links are valid for 90 days. The owner can generate a new one.
             </p>
-            <Link href="https://cvpulse.io">
+            <Link href="/">
               <Button variant="primary" size="md">Go to CV Pulse →</Button>
             </Link>
           </div>
@@ -154,7 +154,7 @@ export default async function SharePage({ params }: SharePageProps) {
         {/* CTA */}
         <div className="text-center">
           <p className="text-sm text-[#444444] mb-4">Want to score your own CV?</p>
-          <Link href="https://cvpulse.io/upload">
+          <Link href="/upload">
             <Button variant="primary" size="md">Get your own CV score →</Button>
           </Link>
         </div>

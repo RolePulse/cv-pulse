@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Keep @react-pdf/renderer server-side only — it has no browser-compatible build
-  serverExternalPackages: ["@react-pdf/renderer"],
+  // Keep these packages server-side only — they have no browser-compatible build
+  // pdf-parse: prevent Next.js from bundling it — the bundled version fails to load
+  // because pdf-parse's debug entry reads a test PDF via fs.readFileSync at module init.
+  // Marking it external forces a real require() at runtime which works fine on Node.
+  serverExternalPackages: ["@react-pdf/renderer", "pdf-parse"],
 };
 
 export default nextConfig;

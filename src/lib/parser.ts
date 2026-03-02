@@ -4,12 +4,15 @@
 // Parse pipeline:
 //   Buffer/text → cleanText → collapseSpacedChars → detectSections → extract* → confidence gate
 
-// pdf-parse is lazy-loaded to avoid its test file read at module init
-// (known issue with pdf-parse and Next.js bundlers)
+// pdf-parse is loaded via its internal module path to avoid the known Next.js bundling issue:
+// The package's default entry (index.js) calls fs.readFileSync on a test PDF at module init,
+// which throws in bundled/serverless environments. The internal path skips that entirely.
+// We also mark pdf-parse as a serverExternalPackages in next.config.ts so Next.js never
+// bundles it — it stays as a real require() at Node runtime.
 type PdfParseResult = { text: string; numpages: number }
 async function pdfParse(buffer: Buffer): Promise<PdfParseResult> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const parse = require('pdf-parse') as (buffer: Buffer) => Promise<PdfParseResult>
+  const parse = require('pdf-parse/lib/pdf-parse.js') as (buffer: Buffer) => Promise<PdfParseResult>
   return parse(buffer)
 }
 
@@ -530,7 +533,7 @@ export async function parseCV(buffer: Buffer): Promise<ParseResult> {
       rawText: '',
       structured: emptyStructured(),
       confidence: 0,
-      failReason: 'Could not read this PDF. Please paste your CV text instead.',
+      failReason: 'This PDF could not be read — it may be corrupted or password-protected.',
     }
   }
 
@@ -539,7 +542,7 @@ export async function parseCV(buffer: Buffer): Promise<ParseResult> {
       rawText,
       structured: emptyStructured(),
       confidence: 0,
-      failReason: 'This PDF appears to be image-based and could not be read. Please paste your CV text instead.',
+      failReason: 'This PDF appears to be image-based (scanned) — no text could be extracted.',
     }
   }
 
@@ -565,7 +568,7 @@ export function parseText(text: string): ParseResult {
 
   const failReason =
     confidence < CONFIDENCE_THRESHOLD
-      ? reasons[0] || 'Could not parse this CV reliably. Please paste your CV text instead.'
+      ? reasons[0] || 'Could not parse this document as a CV — check it is a standard CV format.'
       : undefined
 
   return { rawText, structured, confidence, failReason }

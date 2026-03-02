@@ -168,6 +168,83 @@ describe('Fix detection', () => {
     expect(fixes.map((f) => f.id)).not.toContain('add-metric-placeholders')
   })
 
+  it('does not detect metric placeholders when placeholder bullet already exists', () => {
+    const cv: StructuredCV = {
+      ...BASE_CV,
+      experience: BASE_CV.experience.map((role) => ({
+        ...role,
+        bullets: [
+          'Managed outbound pipeline',
+          '[Add metric: e.g. achieved X% improvement / drove £X revenue / hit X% of quota]',
+        ],
+      })),
+    }
+    const fixes = detectAvailableFixes(cv)
+    expect(fixes.map((f) => f.id)).not.toContain('add-metric-placeholders')
+  })
+
+  it('does not detect company one-liners when context placeholder already exists', () => {
+    const cv: StructuredCV = {
+      ...BASE_CV,
+      experience: BASE_CV.experience.map((role) => ({
+        ...role,
+        bullets: [
+          '[Context: Acme — add one sentence: what does the company do and how big is it?]',
+          'Managed outbound pipeline across the EMEA region',
+        ],
+      })),
+    }
+    const fixes = detectAvailableFixes(cv)
+    expect(fixes.map((f) => f.id)).not.toContain('add-company-one-liners')
+  })
+
+  it('does not detect gap explanations when gap note already exists', () => {
+    const cv: StructuredCV = {
+      summary: 'SDR with gap.',
+      experience: [
+        {
+          title: 'SDR',
+          company: 'Acme',
+          start: 'Jan 2022',
+          end: 'Dec 2022',
+          bullets: [
+            'Managed pipeline',
+            '[Gap note: 10 months between this role and SDR at Beta. Add brief explanation]',
+          ],
+        },
+        { title: 'SDR', company: 'Beta', start: 'Nov 2023', end: 'Present', bullets: ['Managed pipeline'] },
+      ],
+      skills: [],
+      education: [],
+      certifications: [],
+    }
+    const fixes = detectAvailableFixes(cv)
+    expect(fixes.map((f) => f.id)).not.toContain('add-gap-explanations')
+  })
+
+  it('does not detect short stint labels when label already exists', () => {
+    const cv: StructuredCV = {
+      summary: 'SDR.',
+      experience: [
+        {
+          title: 'SDR',
+          company: 'Acme',
+          start: 'Jan 2022',
+          end: 'Jun 2022',
+          bullets: [
+            '[Short tenure (5 months): add context — e.g. contract role, company acquired]',
+            'Managed pipeline',
+          ],
+        },
+      ],
+      skills: [],
+      education: [],
+      certifications: [],
+    }
+    const fixes = detectAvailableFixes(cv)
+    expect(fixes.map((f) => f.id)).not.toContain('add-short-stint-labels')
+  })
+
   it('returns empty array for a perfect CV with no fixes needed', () => {
     const perfect: StructuredCV = {
       summary: 'Senior SDR targeting enterprise SaaS with consistent quota attainment.',

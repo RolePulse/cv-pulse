@@ -564,13 +564,16 @@ function EditorContent() {
   }, [cvId, isRescoring, flushSave])
 
   // ── Apply one-click fix ───────────────────────────────────────────────────
+  // Uses latestCV.current (ref) so rapid successive clicks don't clobber each other
   const handleApplyFix = useCallback((fixId: AvailableFix['id']) => {
-    if (!cv) return
-    const updated = applyFix(cv, fixId)
+    const current = latestCV.current
+    if (!current) return
+    const updated = applyFix(current, fixId)
+    latestCV.current = updated   // update ref immediately before scheduleSave overwrites it
     setCV(updated)
     scheduleSave(updated)
     // Fixes list recomputes via the useEffect watching cv
-  }, [cv, scheduleSave])
+  }, [scheduleSave])
 
   // ── CV field updaters ─────────────────────────────────────────────────────
   const updateSummary = (summary: string) => {

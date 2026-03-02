@@ -90,6 +90,8 @@ function ExportContent() {
   const [resolvedCvId, setResolvedCvId] = useState<string | null>(cvId)
   const [downloading, setDownloading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   // If no cvId in URL, resolve from current user's latest CV
   useEffect(() => {
@@ -109,6 +111,28 @@ function ExportContent() {
     }
     resolve()
   }, [resolvedCvId])
+
+  // Generate share link once we have a CV id
+  useEffect(() => {
+    if (!resolvedCvId) return
+    fetch(`/api/cv/${resolvedCvId}/share`, { method: 'POST' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.shareUrl) setShareUrl(data.shareUrl) })
+      .catch(() => { /* non-fatal — share link is optional */ })
+  }, [resolvedCvId])
+
+  async function handleCopy() {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      // Fallback: select input text
+      const input = document.getElementById('share-url-input') as HTMLInputElement | null
+      input?.select()
+    }
+  }
 
   async function handleDownload(templateId: 'classic' | 'modern') {
     if (!resolvedCvId) {
@@ -226,11 +250,19 @@ function ExportContent() {
             Share a redacted link — score, pass/fail, and checklist titles only. No CV text, no contact info.
           </p>
           <div className="flex items-center gap-2">
-            <div className="flex-1 bg-[#FAFAFA] border border-[#DDDDDD] rounded-[6px] px-3 py-2 text-sm text-[#999999] truncate">
-              cvpulse.io/share/abc123… (coming in Epic 12)
-            </div>
-            <Button variant="secondary" size="sm" disabled>
-              Copy
+            <input
+              id="share-url-input"
+              readOnly
+              value={shareUrl ?? 'Generating link…'}
+              className="flex-1 bg-[#FAFAFA] border border-[#DDDDDD] rounded-[6px] px-3 py-2 text-sm text-[#444444] truncate outline-none"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!shareUrl}
+              onClick={handleCopy}
+            >
+              {copied ? '✓ Copied' : 'Copy'}
             </Button>
           </div>
         </div>

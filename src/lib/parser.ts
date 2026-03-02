@@ -155,6 +155,15 @@ function looksLikeDateRange(line: string): boolean {
   return DATE_RANGE_RE.test(line)
 }
 
+// Returns true for bare location lines like "London, UK" / "San Francisco, CA" / "Hammersmith, London"
+// These appear between the company/title line and the date line in many UK/US templates
+function looksLikeLocation(line: string): boolean {
+  const trimmed = line.trim()
+  if (trimmed.length > 50) return false
+  // "City, Region" where region is a word or 2-letter state code — no digits, no bullet chars
+  return /^[A-Za-z][A-Za-z\s\-]+,\s*[A-Za-z]{2,}$/.test(trimmed) && !/\d/.test(trimmed)
+}
+
 function parseEndDate(raw: string): string | null {
   return /present|current|now/i.test(raw) ? null : raw.trim()
 }
@@ -228,26 +237,34 @@ export function extractExperience(text: string): ExperienceRole[] {
     // Case A: date range inline — "Company Name   Jan 2020 – Dec 2021"
     const dateStart = dateLine.indexOf(rangeMatch[0])
     const textBefore = dateLine.slice(0, dateStart).trim().replace(/[|·—,]+$/, '').trim()
-    if (textBefore.length > 2) company = textBefore
+    // Guard: must be > 5 chars and not a partial date fragment (e.g. "11/", "Jan")
+    if (textBefore.length > 5 && !/^\d{1,4}[\/\-]?$/.test(textBefore)) company = textBefore
 
     const prev1 = dateIdx > 0 ? lines[dateIdx - 1] : ''
     const prev2 = dateIdx > 1 ? lines[dateIdx - 2] : ''
+    const prev3 = dateIdx > 2 ? lines[dateIdx - 3] : ''
+
+    // If prev1 is a bare location line (e.g. "London, UK"), skip it and use prev2/prev3 for role data
+    const skip1 = looksLikeLocation(prev1)
+    const effective1 = skip1 ? prev2 : prev1
+    const effective2 = skip1 ? prev3 : prev2
 
     if (!company) {
-      if (prev1 && (prev1.includes('|') || prev1.includes('·') || prev1.includes(',') && prev1.length < 60)) {
-        // "Title | Company" or "Title · Company" or "Title, Company"
-        const sep = prev1.includes('|') ? '|' : prev1.includes('·') ? '·' : ','
-        const parts = prev1.split(sep).map(s => s.trim())
+      if (effective1 && (effective1.includes('|') || effective1.includes('·'))) {
+        // "Title | Company" or "Title · Company" — reliable delimiters only
+        // Comma is intentionally excluded: too many false positives with "City, State/Country" location strings
+        const sep = effective1.includes('|') ? '|' : '·'
+        const parts = effective1.split(sep).map(s => s.trim())
         title = parts[0] || ''
         company = parts[1] || ''
-      } else if (prev1 && prev2 && !looksLikeDateRange(prev2) && !looksLikeDateRange(prev1)) {
-        // Two separate lines
-        title = prev2
-        company = prev1
-      } else if (prev1 && !looksLikeDateRange(prev1)) {
-        title = prev1
+      } else if (effective1 && effective2 && !looksLikeDateRange(effective2) && !looksLikeDateRange(effective1)) {
+        // Two separate lines: prev2 = title, prev1 = company (standard UK format)
+        title = effective2
+        company = effective1
+      } else if (effective1 && !looksLikeDateRange(effective1)) {
+        title = effective1
       }
-    } else if (prev1 && !looksLikeDateRange(prev1)) {
+    } else if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocation(prev1)) {
       title = prev1
     }
 

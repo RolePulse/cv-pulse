@@ -147,8 +147,10 @@ export function detectAvailableFixes(cv: StructuredCV): AvailableFix[] {
     })
   }
 
-  // 2. Metric placeholders (roles with 0 quantified bullets)
-  const noMetricRoles = roles.slice(0, 3).filter((r) => r.bullets.filter(isQuantified).length === 0)
+  // 2. Metric placeholders (roles with 0 quantified bullets AND no placeholder already added)
+  const noMetricRoles = roles.slice(0, 3).filter(
+    (r) => r.bullets.filter(isQuantified).length === 0 && !r.bullets.some((b) => b.startsWith('[Add metric:'))
+  )
   if (noMetricRoles.length > 0) {
     fixes.push({
       id: 'add-metric-placeholders',
@@ -158,10 +160,11 @@ export function detectAvailableFixes(cv: StructuredCV): AvailableFix[] {
     })
   }
 
-  // 3. Company one-liners (roles with no short context bullet)
-  // Heuristic: no bullet under 80 chars that gives company context
+  // 3. Company one-liners (roles with no short context bullet AND no placeholder already added)
   const noContextRoles = roles.filter(
-    (r) => !r.bullets.some((b) => b.trim().length < 80 && b.trim().length > 10)
+    (r) =>
+      !r.bullets.some((b) => b.trim().length < 80 && b.trim().length > 10) &&
+      !r.bullets.some((b) => b.startsWith('[Context:'))
   )
   if (noContextRoles.length > 0) {
     fixes.push({
@@ -172,7 +175,7 @@ export function detectAvailableFixes(cv: StructuredCV): AvailableFix[] {
     })
   }
 
-  // 4. Gap explanations (consecutive roles with gap > 6 months)
+  // 4. Gap explanations (consecutive roles with gap > 6 months AND no gap note already added)
   const sortedRoles = [...roles].sort((a, b) => {
     const [ay, am] = parseDateToYM(a.start) ?? [0, 0]
     const [by, bm] = parseDateToYM(b.start) ?? [0, 0]
@@ -182,7 +185,8 @@ export function detectAvailableFixes(cv: StructuredCV): AvailableFix[] {
   for (let i = 0; i < sortedRoles.length - 1; i++) {
     const endDate = parseDateToYM(sortedRoles[i].end ?? 'present')
     const nextStart = parseDateToYM(sortedRoles[i + 1].start)
-    if (endDate && nextStart && monthDiff(endDate, nextStart) > 6) {
+    const alreadyLabelled = sortedRoles[i].bullets.some((b) => b.startsWith('[Gap note:'))
+    if (endDate && nextStart && monthDiff(endDate, nextStart) > 6 && !alreadyLabelled) {
       gapCount++
     }
   }
@@ -195,13 +199,14 @@ export function detectAvailableFixes(cv: StructuredCV): AvailableFix[] {
     })
   }
 
-  // 5. Short stint labels (roles lasting < 12 months, excluding present roles)
+  // 5. Short stint labels (roles lasting < 12 months AND no label already added)
   const shortStintRoles = roles.filter((r) => {
     if (!r.end || r.end.toLowerCase().includes('present')) return false
     const start = parseDateToYM(r.start)
     const end = parseDateToYM(r.end)
     if (!start || !end) return false
-    return monthDiff(start, end) < 12
+    if (monthDiff(start, end) >= 12) return false
+    return !r.bullets.some((b) => b.startsWith('[Short tenure'))
   })
   if (shortStintRoles.length > 0) {
     fixes.push({

@@ -262,6 +262,30 @@ function ScoreHistoryStrip({
   )
 }
 
+// ── Placeholder reminder ──────────────────────────────────────────────────────
+
+// Counts unfilled placeholder bullets (those starting with "[")
+function countPlaceholders(cv: import('@/types/database').StructuredCV | null): number {
+  if (!cv) return 0
+  return cv.experience.reduce((total, role) =>
+    total + role.bullets.filter((b) => b.trim().startsWith('[')).length,
+  0)
+}
+
+function PlaceholderReminder({ count }: { count: number }) {
+  if (count === 0) return null
+  return (
+    <div className="bg-[#FFF3E6] border border-[#FFCCA0] rounded-[8px] p-4 mt-3">
+      <p className="text-[12px] font-semibold text-[#CC5500] mb-1">
+        {count} placeholder{count > 1 ? 's' : ''} to fill in
+      </p>
+      <p className="text-[11px] text-[#884400] leading-relaxed">
+        Replace the <span className="font-mono bg-[#FFE8CC] px-0.5 rounded">[bracketed]</span> items in your bullets with real content — that&apos;s what actually moves your score.
+      </p>
+    </div>
+  )
+}
+
 // ── Quick fixes panel ─────────────────────────────────────────────────────────
 
 function QuickFixesPanel({
@@ -788,6 +812,7 @@ function EditorContent() {
               fixes={availableFixes}
               onApply={handleApplyFix}
             />
+            <PlaceholderReminder count={countPlaceholders(cv)} />
           </div>
         </div>
       </div>

@@ -155,7 +155,7 @@ export function detectAvailableFixes(cv: StructuredCV): AvailableFix[] {
     fixes.push({
       id: 'add-metric-placeholders',
       label: 'Add metric placeholders',
-      description: `${noMetricRoles.length} role${noMetricRoles.length > 1 ? 's have' : ' has'} no measurable results — placeholders added for you to fill in.`,
+      description: `${noMetricRoles.length} role${noMetricRoles.length > 1 ? 's have' : ' has'} no measurable results. Adds reminder bullets — replace them with real numbers to boost your score.`,
       rolesAffected: noMetricRoles.length,
     })
   }

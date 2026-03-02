@@ -548,12 +548,17 @@ export async function parseCV(buffer: Buffer): Promise<ParseResult> {
   try {
     const data = await pdfParse(buffer)
     rawText = cleanText(data.text)
-  } catch {
+  } catch (err: unknown) {
+    // pdfjs throws a PasswordException (name = 'PasswordException') for encrypted PDFs
+    const isPasswordProtected =
+      err instanceof Error && (err as Error & { name?: string }).name === 'PasswordException'
     return {
       rawText: '',
       structured: emptyStructured(),
       confidence: 0,
-      failReason: 'This PDF could not be read — it may be corrupted or password-protected.',
+      failReason: isPasswordProtected
+        ? 'This PDF is password-protected — remove the password and re-upload.'
+        : 'This PDF could not be read — it may be corrupted or password-protected.',
     }
   }
 

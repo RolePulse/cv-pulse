@@ -133,16 +133,18 @@ export const DATE_TOKEN_RE = new RegExp(
   'i'
 )
 
-// A full date range: "Jan 2020 – Dec 2021" / "2019 – Present" / "2019-2022"
+// A full date range: "Jan 2020 – Dec 2021" / "2019 – Present" / "2019-2022" / "Jan 2020 to Dec 2021"
+// DATE_SEP: dash/en-dash/em-dash OR " to " OR " through " OR " until " (common in US CVs)
+const DATE_SEP = `(?:\\s*[-–—]\\s*|\\s+to\\s+|\\s+through\\s+|\\s+until\\s+)`
 export const DATE_RANGE_RE = new RegExp(
-  `(?:(?:${MONTHS_PATTERN})\\.?\\s+)?(?:20|19)\\d{2}\\s*[-–—]\\s*(?:(?:(?:${MONTHS_PATTERN})\\.?\\s+)?(?:20|19)\\d{2}|present|current|now)`,
+  `(?:(?:${MONTHS_PATTERN})\\.?\\s+)?(?:20|19)\\d{2}${DATE_SEP}(?:(?:(?:${MONTHS_PATTERN})\\.?\\s+)?(?:20|19)\\d{2}|present|current|now)`,
   'i'
 )
 
-// Abbreviated 2-digit year range: "Oct 24 – Dec 24" / "Apr 21 – Jul 24"
+// Abbreviated 2-digit year range: "Oct 24 – Dec 24" / "Apr 21 – Jul 24" / "Oct 24 to Dec 24"
 // Requires full month name on both sides to avoid false positives
 export const DATE_RANGE_SHORT_RE = new RegExp(
-  `(?:${MONTHS_PATTERN})\\.?\\s+\\d{2}\\s*[-–—]\\s*(?:(?:${MONTHS_PATTERN})\\.?\\s+\\d{2}|present|current|now)`,
+  `(?:${MONTHS_PATTERN})\\.?\\s+\\d{2}${DATE_SEP}(?:(?:${MONTHS_PATTERN})\\.?\\s+\\d{2}|present|current|now)`,
   'i'
 )
 
@@ -214,7 +216,8 @@ export function extractExperience(text: string): ExperienceRole[] {
     if (!rangeMatch) return
 
     const fullRange = rangeMatch[0]
-    const rangeParts = fullRange.split(/[-–—]/).map(s => s.trim())
+    // Split on dash/en-dash/em-dash OR word separators "to"/"through"/"until"
+    const rangeParts = fullRange.split(/[-–—]|\s+to\s+|\s+through\s+|\s+until\s+/).map(s => s.trim())
     const start = rangeParts[0] || ''
     const end = parseEndDate(rangeParts[1] || '')
 

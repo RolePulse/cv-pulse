@@ -465,9 +465,65 @@ export function countDetectedSections(text: string): number {
   return count
 }
 
+// ─── Non-CV hard-reject patterns ─────────────────────────────────────────────
+// Phrases that only appear in financial/administrative documents, never in CVs.
+// Any single match caps confidence at 15 (well below the 40 threshold).
+const NON_CV_HARD_REJECT = [
+  /\bbank\s+statement\b/i,
+  /\baccount\s+statement\b/i,
+  /\bsort\s+code\b/i,
+  /\bvat\s+reg(?:istration)?\s*(?:no|number|#)?\b/i,
+  /\binvoice\s*(?:no|number|#)\b/i,
+  /\bamount\s+due\b/i,
+  /\btotal\s+(?:amount\s+)?due\b/i,
+  /\bremittance\s+advice\b/i,
+  /\bbacs\s+payment\b/i,
+  /\bearnings\s+statement\b/i,
+  /\bpay\s*slip\b/i,
+  /\b(?:p60|p45|p11d)\b/i,
+  /\baccount\s+(?:no|number)\s*:?\s*\d{6,}/i,
+  /\biban\s*:?\s*[A-Z]{2}\d{2}/i,
+]
+
+// Soft financial signals — if several co-occur the document is almost certainly
+// a financial record, not a CV.
+const NON_CV_SOFT_SIGNALS = [
+  /\bbalance\b/i,
+  /\bdebit\b/i,
+  /\bcredit\b/i,
+  /\btransaction(?:s)?\b/i,
+  /\bstatement\s+(?:date|period)\b/i,
+  /\bopening\s+balance\b/i,
+  /\bclosing\s+balance\b/i,
+  /\bpayment\s+reference\b/i,
+  /\boverdrawn?\b/i,
+]
+
 export function calculateConfidence(text: string, structured: StructuredCV): ConfidenceResult {
   const reasons: string[] = []
   let score = 0
+
+  // ── Pre-check: hard-reject non-CV documents ───────────────────────────────
+  // Financial documents (bank statements, invoices, payslips) can accidentally
+  // pass the confidence gate because they have text volume, a name, dates, and
+  // structured lines.  Catch them before any positive scoring.
+  for (const pattern of NON_CV_HARD_REJECT) {
+    if (pattern.test(text)) {
+      return {
+        score: 0,
+        reasons: [`Document rejected: contains non-CV phrase matching ${pattern.source}`],
+      }
+    }
+  }
+
+  // Soft-signal check: 4+ financial signals → almost certainly a financial doc
+  const softHits = NON_CV_SOFT_SIGNALS.filter(p => p.test(text)).length
+  if (softHits >= 4) {
+    return {
+      score: 10,
+      reasons: [`Document rejected: ${softHits} financial signals detected (balance, debit, credit, transactions, etc.) — likely a bank statement or financial record`],
+    }
+  }
 
   // ── Criterion 1: Text volume — can we actually read this? (20pts) ──────────
   const charCount = text.replace(/\s/g, '').length

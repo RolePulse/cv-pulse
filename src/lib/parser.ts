@@ -136,8 +136,16 @@ export const DATE_TOKEN_RE = new RegExp(
 // A full date range: "Jan 2020 – Dec 2021" / "2019 – Present" / "2019-2022" / "Jan 2020 to Dec 2021"
 // DATE_SEP: dash/en-dash/em-dash OR " to " OR " through " OR " until " (common in US CVs)
 const DATE_SEP = `(?:\\s*[-–—]\\s*|\\s+to\\s+|\\s+through\\s+|\\s+until\\s+)`
+
+// DATE_PART matches any single date value — covers:
+//   "Jan 2020"   — month name + 4-digit year
+//   "2020"       — bare 4-digit year
+//   "8/21"       — M/YY (US short: "8/21", "06/23")
+//   "06/2021"    — M/YYYY (US long: "06/2021", "5/2024")
+const DATE_PART = `(?:(?:${MONTHS_PATTERN})\\.?\\s+)?(?:(?:20|19)\\d{2}|\\d{1,2}\\/(?:(?:20|19)\\d{2}|\\d{2}))`
+
 export const DATE_RANGE_RE = new RegExp(
-  `(?:(?:${MONTHS_PATTERN})\\.?\\s+)?(?:20|19)\\d{2}${DATE_SEP}(?:(?:(?:${MONTHS_PATTERN})\\.?\\s+)?(?:20|19)\\d{2}|present|current|now)`,
+  `${DATE_PART}${DATE_SEP}(?:${DATE_PART}|present|current|now)`,
   'i'
 )
 
@@ -162,6 +170,12 @@ function looksLikeLocation(line: string): boolean {
   if (trimmed.length > 50) return false
   // "City, Region" where region is a word or 2-letter state code — no digits, no bullet chars
   return /^[A-Za-z][A-Za-z\s\-]+,\s*[A-Za-z]{2,}$/.test(trimmed) && !/\d/.test(trimmed)
+}
+
+// Returns true for lines that are just a lone column-separator artifact (e.g. "|" or "·")
+// PDF two-column layouts often render column dividers as isolated chars on their own line
+function looksLikeSeparator(line: string): boolean {
+  return /^[\s|·•\-—]+$/.test(line) && line.trim().length <= 3
 }
 
 function parseEndDate(raw: string): string | null {
@@ -196,13 +210,18 @@ export function extractBullets(text: string): string[] {
 export function extractExperience(text: string): ExperienceRole[] {
   if (!text.trim()) return []
 
-  const lines = text.split('\n').map(l => l.trim())
+  // Normalise bracket-quoted date lines: "[August '23 - Current]" → "August 23 - Current"
+  // Common in some US resume templates that wrap dates in square brackets with shorthand years.
+  // Note: the apostrophe in "'23" is often a Unicode right-single-quote (U+2019), not ASCII (U+0027).
+  const lines = text.split('\n').map(l =>
+    l.trim().replace(/\[([^\]]*)\]/g, (_, inner) => inner.replace(/['\u2018\u2019\u02BC]/g, ''))
+  )
   const roles: ExperienceRole[] = []
 
-  // Primary: find lines containing full date ranges
+  // Primary: find lines containing full date ranges (4-digit year) or short ranges (2-digit year: "Aug 23 – Nov 24")
   let dateLineIndices: number[] = []
   lines.forEach((line, i) => {
-    if (DATE_RANGE_RE.test(line)) dateLineIndices.push(i)
+    if (DATE_RANGE_RE.test(line) || DATE_RANGE_SHORT_RE.test(line)) dateLineIndices.push(i)
   })
 
   // Fallback: if no ranges found, anchor on lines containing year tokens
@@ -221,7 +240,7 @@ export function extractExperience(text: string): ExperienceRole[] {
 
   dateLineIndices.forEach((dateIdx, position) => {
     const dateLine = lines[dateIdx]
-    const rangeMatch = dateLine.match(DATE_RANGE_RE)
+    const rangeMatch = dateLine.match(DATE_RANGE_RE) ?? dateLine.match(DATE_RANGE_SHORT_RE)
     if (!rangeMatch) return
 
     const fullRange = rangeMatch[0]
@@ -236,16 +255,23 @@ export function extractExperience(text: string): ExperienceRole[] {
 
     // Case A: date range inline — "Company Name   Jan 2020 – Dec 2021"
     const dateStart = dateLine.indexOf(rangeMatch[0])
-    const textBefore = dateLine.slice(0, dateStart).trim().replace(/[|·—,]+$/, '').trim()
-    // Guard: must be > 5 chars and not a partial date fragment (e.g. "11/", "Jan")
+    const textBefore = dateLine.slice(0, dateStart).trim().replace(/[|·—,\s]+$/, '').trim()
+    // Guard: must be > 5 chars and not a partial date fragment (e.g. "11/", "Jan", "06/")
     if (textBefore.length > 5 && !/^\d{1,4}[\/\-]?$/.test(textBefore)) company = textBefore
+
+    // Case B: date at line start — "5/2024-4/2025 GIMMECREDIT, Tarrytown NY"
+    // When textBefore is empty, grab the text AFTER the date match as the company
+    if (!company) {
+      const textAfter = dateLine.slice(dateStart + rangeMatch[0].length).trim().replace(/^[|·—,\s]+/, '').trim()
+      if (textAfter.length > 3 && !/^\d/.test(textAfter)) company = textAfter
+    }
 
     const prev1 = dateIdx > 0 ? lines[dateIdx - 1] : ''
     const prev2 = dateIdx > 1 ? lines[dateIdx - 2] : ''
     const prev3 = dateIdx > 2 ? lines[dateIdx - 3] : ''
 
-    // If prev1 is a bare location line (e.g. "London, UK"), skip it and use prev2/prev3 for role data
-    const skip1 = looksLikeLocation(prev1)
+    // Skip prev1 if it is a bare location line or a lone column-separator char (PDF layout artifact)
+    const skip1 = looksLikeLocation(prev1) || looksLikeSeparator(prev1)
     const effective1 = skip1 ? prev2 : prev1
     const effective2 = skip1 ? prev3 : prev2
 
@@ -258,13 +284,13 @@ export function extractExperience(text: string): ExperienceRole[] {
         title = parts[0] || ''
         company = parts[1] || ''
       } else if (effective1 && effective2 && !looksLikeDateRange(effective2) && !looksLikeDateRange(effective1)) {
-        // Two separate lines: prev2 = title, prev1 = company (standard UK format)
+        // Two separate lines: effective2 = title, effective1 = company (standard UK format)
         title = effective2
         company = effective1
       } else if (effective1 && !looksLikeDateRange(effective1)) {
         title = effective1
       }
-    } else if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocation(prev1)) {
+    } else if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocation(prev1) && !looksLikeSeparator(prev1)) {
       title = prev1
     }
 
@@ -580,10 +606,13 @@ export function parseText(text: string): ParseResult {
   const rawText = cleanText(text)
   const sections = detectSections(rawText)
 
+  // Use section content only if it's substantial (> 100 chars).
+  // A tiny stub (e.g. just a LinkedIn URL or heading) means section detection misfired — fall back to full text.
+  const expSection = (sections.experience?.length ?? 0) > 100 ? sections.experience! : rawText
+
   const structured: StructuredCV = {
     summary: sections.summary || '',
-    // Fall back to full text if no experience section detected (catches multi-column CVs)
-    experience: extractExperience(sections.experience || rawText),
+    experience: extractExperience(expSection),
     skills: extractSkills(sections.skills || ''),
     education: extractEducation(sections.education || ''),
     certifications: extractSkills(sections.certifications || ''),

@@ -101,7 +101,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#FFF7F2]">
-      <Header isSignedIn userInitial="A" />
+      <Header isSignedIn />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
         <div className="flex items-center justify-between mb-6">

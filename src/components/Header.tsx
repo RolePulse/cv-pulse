@@ -1,10 +1,9 @@
 import Link from 'next/link'
 import Button from './Button'
-import SignOutButton from './SignOutButton'
+import UserNav from './UserNav'
 
 interface HeaderProps {
   isSignedIn?: boolean
-  userInitial?: string
 }
 
 // Pulse waveform icon — matches RolePulse visual DNA
@@ -22,7 +21,7 @@ function PulseIcon() {
   )
 }
 
-export default function Header({ isSignedIn = false, userInitial }: HeaderProps) {
+export default function Header({ isSignedIn = false }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-[#DDDDDD]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
@@ -39,12 +38,7 @@ export default function Header({ isSignedIn = false, userInitial }: HeaderProps)
         {/* Right side */}
         <div className="flex items-center gap-3">
           {isSignedIn ? (
-            <>
-              <div className="w-8 h-8 rounded-full bg-[#FF6B00] flex items-center justify-center text-white text-sm font-semibold">
-                {userInitial ?? '?'}
-              </div>
-              <SignOutButton />
-            </>
+            <UserNav />
           ) : (
             <Button variant="secondary" size="sm">
               <Link href="/upload">Sign in</Link>

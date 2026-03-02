@@ -133,7 +133,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-[#FFF7F2]">
-      <Header isSignedIn userInitial={userInitial} />
+      <Header isSignedIn />
 
       <main className="max-w-xl mx-auto px-4 sm:px-6 py-12">
         <h1 className="text-2xl font-bold text-[#222222] mb-8">Settings</h1>

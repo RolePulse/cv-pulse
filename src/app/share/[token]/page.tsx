@@ -15,9 +15,9 @@ interface SharePageProps {
 
 const BUCKET_CONFIG: { key: keyof BucketScores; label: string; max: number }[] = [
   { key: 'proof_of_impact', label: 'Proof of impact', max: 35 },
-  { key: 'ats_keywords',    label: 'ATS / Keywords',  max: 25 },
-  { key: 'formatting',      label: 'Formatting',       max: 20 },
-  { key: 'clarity',         label: 'Clarity',          max: 20 },
+  { key: 'ats_keywords',    label: 'ATS & keywords',    max: 25 },
+  { key: 'formatting',      label: 'Formatting',        max: 20 },
+  { key: 'clarity',         label: 'Clarity & structure', max: 20 },
 ]
 
 // ── Score colour helper ─────────────────────────────────────────────────────

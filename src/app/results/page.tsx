@@ -62,7 +62,7 @@ const CATEGORY_LABELS: Record<ChecklistItem['category'], string> = {
 
 const BUCKET_CONFIG = [
   { key: 'proofOfImpact' as const, label: 'Proof of impact',  max: 35 },
-  { key: 'atsKeywords'   as const, label: 'ATS / Keywords',   max: 25 },
+  { key: 'atsKeywords'   as const, label: 'ATS & keywords',   max: 25 },
   { key: 'formatting'    as const, label: 'Formatting',        max: 20 },
   { key: 'clarity'       as const, label: 'Clarity & structure', max: 20 },
 ]

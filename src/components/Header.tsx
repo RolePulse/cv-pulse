@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Button from './Button'
+import SignOutButton from './SignOutButton'
 
 interface HeaderProps {
   isSignedIn?: boolean
@@ -42,12 +43,7 @@ export default function Header({ isSignedIn = false, userInitial }: HeaderProps)
               <div className="w-8 h-8 rounded-full bg-[#FF6B00] flex items-center justify-center text-white text-sm font-semibold">
                 {userInitial ?? '?'}
               </div>
-              <Link
-                href="/api/auth/signout"
-                className="text-sm text-[#444444] hover:text-[#222222] transition-colors"
-              >
-                Sign out
-              </Link>
+              <SignOutButton />
             </>
           ) : (
             <Button variant="secondary" size="sm">

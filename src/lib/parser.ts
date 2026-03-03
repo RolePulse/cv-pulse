@@ -169,7 +169,8 @@ function looksLikeLocation(line: string): boolean {
   const trimmed = line.trim()
   if (trimmed.length > 50) return false
   // "City, Region" where region is a word or 2-letter state code — no digits, no bullet chars
-  return /^[A-Za-z][A-Za-z\s\-]+,\s*[A-Za-z]{2,}$/.test(trimmed) && !/\d/.test(trimmed)
+  // \s*$ allows for any stray trailing whitespace not caught by trim() (Unicode spaces, etc.)
+  return /^[A-Za-z][A-Za-z\s\-]+,\s*[A-Za-z]{2,}\s*$/.test(trimmed) && !/\d/.test(trimmed)
 }
 
 // Returns true for lines that are just a lone column-separator artifact (e.g. "|" or "·")
@@ -207,15 +208,62 @@ export function extractBullets(text: string): string[] {
 //
 // Strategy: primary = anchor on date ranges; fallback = anchor on year tokens.
 
+// Strip ticker annotations and trailing location noise from company name lines.
+// e.g. "AvePoint (Ticker: AV P T ) Jersey City, NJ" → "AvePoint"
+//      "HiBob (acquired Mosaic) New York, NY"        → "HiBob (acquired Mosaic)"
+function cleanCompanyLine(raw: string): string {
+  return raw
+    // Strip ticker/exchange annotations: "(Ticker: AVPT)", "(NYSE: X)", "(NASDAQ: AVPT)"
+    .replace(/\s*\((?:Ticker|NYSE|NASDAQ|LSE|ASX|Symbol)\s*:?[^)]*\)/gi, '')
+    // Strip trailing location noise: " Jersey City, NJ" / ", San Francisco, CA" / ", UK"
+    // Matches: optional comma or space, then Title-Case word(s), then ", XX" (2-char code)
+    .replace(/(?:,|\s)\s*[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*,\s*[A-Z]{2}\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export function extractExperience(text: string): ExperienceRole[] {
   if (!text.trim()) return []
 
   // Normalise bracket-quoted date lines: "[August '23 - Current]" → "August 23 - Current"
   // Common in some US resume templates that wrap dates in square brackets with shorthand years.
   // Note: the apostrophe in "'23" is often a Unicode right-single-quote (U+2019), not ASCII (U+0027).
-  const lines = text.split('\n').map(l =>
+  const rawLines = text.split('\n').map(l =>
     l.trim().replace(/\[([^\]]*)\]/g, (_, inner) => inner.replace(/['\u2018\u2019\u02BC]/g, ''))
   )
+
+  // ── Merge split bullets ──────────────────────────────────────────────────
+  // Some PDFs (AvePoint, GovInvest) emit each bullet in two lines:
+  //   Line N:   "•"   (lone bullet char — no content)
+  //   Line N+1: "Increased pipeline by 40%..."
+  // Microsoft Word "o" sub-bullets also split this way.
+  // We merge them so isBulletLine() fires correctly on the joined line.
+  const lines: string[] = []
+  const LONE_BULLET_RE = /^[•*▪▸◦→·✓➤➢●○▶£►]\s*$/
+  for (let mi = 0; mi < rawLines.length; mi++) {
+    const line = rawLines[mi]
+    const isLoneBullet = LONE_BULLET_RE.test(line)
+    const isLoneO = line === 'o'
+    if ((isLoneBullet || isLoneO) && mi + 1 < rawLines.length) {
+      const next = rawLines[mi + 1]
+      // Only merge if next line is substantive content (not a date / another lone bullet)
+      if (
+        next.length >= 5 &&
+        !DATE_RANGE_RE.test(next) &&
+        !DATE_RANGE_SHORT_RE.test(next) &&
+        !LONE_BULLET_RE.test(next) &&
+        next !== 'o'
+      ) {
+        // For "o" sub-bullets: prefix with • so isBulletLine() recognises the merged line
+        const prefix = isLoneO ? '•' : line
+        lines.push(`${prefix} ${next}`)
+        mi++ // consumed next line
+        continue
+      }
+    }
+    lines.push(line)
+  }
+
   const roles: ExperienceRole[] = []
 
   // Primary: find lines containing full date ranges (4-digit year) or short ranges (2-digit year: "Aug 23 – Nov 24")
@@ -307,16 +355,25 @@ export function extractExperience(text: string): ExperienceRole[] {
     // Skip prev1 if it is a bare location, separator, or bullet from the previous role's content
     const skip1 = looksLikeLocation(prev1) || looksLikeSeparator(prev1) || isBulletLine(prev1)
     const effective1 = skip1 ? prev2 : prev1
-    const effective2 = skip1 ? prev3 : prev2
+
+    // skip2: also skip location lines one level further back
+    // 4-line header pattern: Company → Location → Title → Date (e.g. MongoDB)
+    // When rawEffective2 is a location, effective2 steps over it to find the real company
+    const rawEffective2 = skip1 ? prev3 : prev2
+    const skip2 = looksLikeLocation(rawEffective2)
+    const effective2 = skip2
+      ? (skip1 ? (dateIdx >= 4 ? lines[dateIdx - 4] : '') : prev3)
+      : rawEffective2
 
     if (endsWithPipe) {
       if (title) {
         // "Title | Date" — title already set from inline text.
         // Get company from the nearest usable prev line (skip location/bullet/date).
+        // Then clean ticker annotations and trailing location noise from the raw company line.
         const companyLine = [prev1, prev2].find(
           l => l && !looksLikeDateRange(l) && !isBulletLine(l) && !looksLikeLocation(l) && !looksLikeSeparator(l)
         )
-        if (companyLine) company = companyLine
+        if (companyLine) company = cleanCompanyLine(companyLine)
       } else if (company) {
         // "Company | Date" — company set from inline text.
         // Get title from prev1 (the line above, e.g. "Senior SDR").
@@ -365,9 +422,16 @@ export function extractExperience(text: string): ExperienceRole[] {
           !isBulletLine(effective1) && !isBulletLine(effective2) &&
           !looksLikeDateRange(effective2) && !looksLikeDateRange(effective1)
         ) {
-          // Two separate lines: effective2 = title, effective1 = company (standard UK format)
-          title = effective2
-          company = effective1
+          if (skip2) {
+            // 4-line header: Company → Location → Title → Date
+            // effective1 = title (line directly above location), effective2 = company (above location)
+            title = effective1
+            company = effective2
+          } else {
+            // Standard two-line: effective2 = title, effective1 = company (standard UK format)
+            title = effective2
+            company = effective1
+          }
         } else if (effective1 && !isBulletLine(effective1) && !looksLikeDateRange(effective1)) {
           title = effective1
         }

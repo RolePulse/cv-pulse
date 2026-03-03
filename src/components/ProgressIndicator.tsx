@@ -1,4 +1,4 @@
-type Step = 'upload' | 'score' | 'edit' | 'export'
+type Step = 'upload' | 'score' | 'export'
 
 interface ProgressIndicatorProps {
   currentStep: Step
@@ -6,12 +6,11 @@ interface ProgressIndicatorProps {
 
 const steps: { key: Step; label: string }[] = [
   { key: 'upload', label: 'Upload' },
-  { key: 'score', label: 'Score' },
-  { key: 'edit', label: 'Edit' },
+  { key: 'score', label: 'Score & Fix' },
   { key: 'export', label: 'Export' },
 ]
 
-const stepOrder: Step[] = ['upload', 'score', 'edit', 'export']
+const stepOrder: Step[] = ['upload', 'score', 'export']
 
 export default function ProgressIndicator({ currentStep }: ProgressIndicatorProps) {
   const currentIndex = stepOrder.indexOf(currentStep)

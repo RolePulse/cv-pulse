@@ -30,3 +30,88 @@
 **Commit:** d47b9b6
 **Deployed:** via git push to main (Vercel auto-deploy)
 **Next step:** User testing with James — verify upload → results flow works end-to-end
+
+---
+
+## 2026-03-02 — Non-CV false-pass rejection
+
+**Commit:** 48a395b
+**Time:** ~17:13 GMT
+
+### Problem
+~8–15 non-CV documents (bank statements, invoices, payslips) were passing the confidence gate and going through scoring. Bank statements scored ~70+ because they have: text volume (20pts), a name (15pts), dates (20pts), and structured lines (20pts).
+
+### Fix
+Added two layers of negative signals to `calculateConfidence()` in `src/lib/parser.ts`, evaluated *before* any positive scoring:
+
+**Hard-reject patterns (score → 0):** Match any of:
+- bank statement, account statement, sort code, IBAN
+- invoice no/number, amount due, total amount due
+- remittance advice, BACS payment
+- earnings statement, pay slip, payslip
+- P60, P45, P11D
+- account number: [6+ digits]
+
+**Soft-signal density (score → 10):** 4+ co-occurring financial signals (balance, debit, credit, transactions, statement period, opening/closing balance, payment reference, overdrawn)
+
+### Finance CVs still pass
+CVs with financial roles ("balance sheet reconciliations", "credit risk models", "debit card products") tested explicitly — confirmed passing. Threshold avoidance: finance CVs rarely hit 4+ soft signals together and never contain hard-reject phrases.
+
+### Tests
+- New file: `src/lib/__tests__/non-cv-rejection.test.ts`
+- 16 new tests (11 hard-reject, 2 soft-signal, 3 real-CV pass-through)
+- Full suite: 793 tests, all passing
+
+### Next step
+James to do real-world user testing of CV Pulse v1.
+
+---
+
+## 2026-03-02 — Sign out fix
+
+**Commit:** 1484199
+**Time:** ~18:38 GMT
+
+### Problem
+Sign out link in `Header.tsx` used `href="/api/auth/signout"` — a NextAuth-style URL that doesn't exist. Clicking Sign out anywhere in the app 404'd, leaving users permanently signed in with no way to sign out.
+
+### Fix
+- Created `src/components/SignOutButton.tsx` — a `'use client'` component that calls `supabase.auth.signOut()` then redirects to `/` via `router.push` and `router.refresh()`
+- Replaced the dead `<Link href="/api/auth/signout">` in `Header.tsx` with `<SignOutButton />`
+- Tested live: Settings → Sign out → redirected to homepage → nav shows "Sign in" ✅
+
+### Tests
+793 tests, all passing (no new tests needed — sign out is auth infrastructure).
+
+---
+
+## 2026-03-03 — Merge results + editor into unified /score page (UX Review #1)
+
+**Time:** ~18:00 GMT
+
+### What changed
+
+Biggest structural UX improvement: merged the separate `/results` and `/editor` pages into a single `/score` page.
+
+**New files:**
+- `src/app/score/page.tsx` — the unified "Score + Fix" page
+
+**Updated files:**
+- `src/components/ProgressIndicator.tsx` — simplified to 3 steps: Upload → Score & Fix → Export
+- `src/app/select-role/page.tsx` — routes to `/score` instead of `/results`
+- `src/app/api/auth/callback/route.ts` — fallback changed from `/results` to `/upload`
+
+**Replaced with redirects (backwards compat):**
+- `src/app/results/page.tsx` — redirects to `/score?cvId=...`
+- `src/app/editor/page.tsx` — redirects to `/score?cvId=...`
+
+### Layout
+
+**Desktop (lg+):** Two-panel side by side
+- Left (sticky, scrollable, w-80/96): Score ring, pass/fail badge, role label, context hint, bucket bars, Re-score button, full checklist accordion, keyword check (collapsed), share link
+- Right (flex-1): Progress + save badge, quick fixes, placeholder reminder, CV editor (summary/experience/skills/education/certs), Export PDF button
+
+**Mobile:** Stacked — score panel above, editor below
+
+### Tests
+793 tests, all passing. Zero TypeScript errors. Build clean.

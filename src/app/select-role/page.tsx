@@ -119,7 +119,7 @@ function SelectRoleContent() {
         return
       }
 
-      router.push(`/results?cvId=${cvId}`)
+      router.push(`/score?cvId=${cvId}`)
     } catch {
       setError('Network error — please check your connection and try again.')
       setIsSaving(false)

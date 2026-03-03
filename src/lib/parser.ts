@@ -208,6 +208,13 @@ export function extractBullets(text: string): string[] {
 //
 // Strategy: primary = anchor on date ranges; fallback = anchor on year tokens.
 
+// Job title keyword detector — used to distinguish inline-title from inline-company.
+// When the text inline before a date contains one of these words, it's almost certainly a title,
+// not a company name. Enables correct parsing of "Title Date" format (no pipe separator):
+//   AvePoint (Ticker: AV P T ) Jersey City, NJ
+//   Enterprise Account Executive Dec 2020 - Aug 2024   ← title inline, company above
+const TITLE_KEYWORD_RE = /\b(?:executive|manager|director|analyst|associate|coordinator|specialist|engineer|developer|consultant|advisor|representative|officer|president|vice\s+president|lead|head\s+of|SDR|BDR|AE|CSM|CSE|SE|VP|CTO|CFO|CMO|COO|CEO|intern|fellow|generalist)\b/i
+
 // Strip ticker annotations and trailing location noise from company name lines.
 // e.g. "AvePoint (Ticker: AV P T ) Jersey City, NJ" → "AvePoint"
 //      "HiBob (acquired Mosaic) New York, NY"        → "HiBob (acquired Mosaic)"
@@ -215,9 +222,10 @@ function cleanCompanyLine(raw: string): string {
   return raw
     // Strip ticker/exchange annotations: "(Ticker: AVPT)", "(NYSE: X)", "(NASDAQ: AVPT)"
     .replace(/\s*\((?:Ticker|NYSE|NASDAQ|LSE|ASX|Symbol)\s*:?[^)]*\)/gi, '')
-    // Strip trailing location noise: " Jersey City, NJ" / ", San Francisco, CA" / ", UK"
-    // Matches: optional comma or space, then Title-Case word(s), then ", XX" (2-char code)
-    .replace(/(?:,|\s)\s*[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*,\s*[A-Z]{2}\s*$/, '')
+    // Strip trailing location noise: " New York, NY" / ", Jersey City, NJ"
+    // Max TWO city words prevents over-stripping: "Brocair Partners New York, NY"
+    // strips only " New York, NY", not " Partners New York, NY"
+    .replace(/(?:,|\s)\s*[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?,\s*[A-Z]{2}\s*$/, '')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -336,6 +344,11 @@ export function extractExperience(text: string): ExperienceRole[] {
         // "Title | Date" format — no title above, so the inline text IS the job title
         // Company will come from the line(s) above (handled below)
         title = textBefore
+      } else if (!endsWithPipe && TITLE_KEYWORD_RE.test(textBefore)) {
+        // "Title Date" inline format (no pipe) — the inline text is the title, company is above.
+        // e.g. "Enterprise Account Executive Dec 2020 - Aug 2024" with company on line above.
+        // Company lookup happens in the dedicated branch below.
+        title = textBefore
       } else {
         company = textBefore
       }
@@ -380,6 +393,20 @@ export function extractExperience(text: string): ExperienceRole[] {
         if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocation(prev1) && !looksLikeSeparator(prev1) && !isBulletLine(prev1)) {
           title = prev1
         }
+      }
+    } else if (title && !company) {
+      // "Title Date" inline format — title was set from inline text, company needs to come from above.
+      // First: look for a clean non-location, non-bullet line (simple company name like "GovInvest").
+      // Second: if not found, check if prev1 is a combined "Company City, State" line and clean it.
+      const strictCompany = [prev1, prev2, prev3].find(
+        l => l && !looksLikeDateRange(l) && !isBulletLine(l) && !looksLikeLocation(l) && !looksLikeSeparator(l)
+      )
+      if (strictCompany) {
+        company = cleanCompanyLine(strictCompany)
+      } else if (prev1 && looksLikeLocation(prev1) && prev1.trim().length > 15) {
+        // "Company City, State" on one line — extract the company portion
+        const cleaned = cleanCompanyLine(prev1)
+        if (cleaned && cleaned.length > 3 && !looksLikeLocation(cleaned)) company = cleaned
       }
     } else if (!company) {
       // No inline company — look for title + company
@@ -426,7 +453,7 @@ export function extractExperience(text: string): ExperienceRole[] {
             // 4-line header: Company → Location → Title → Date
             // effective1 = title (line directly above location), effective2 = company (above location)
             title = effective1
-            company = effective2
+            company = cleanCompanyLine(effective2)
           } else {
             // Standard two-line: effective2 = title, effective1 = company (standard UK format)
             title = effective2
@@ -443,12 +470,46 @@ export function extractExperience(text: string): ExperienceRole[] {
       }
     }
 
-    // ── Extract bullets forward ────────────────────────────────────────────
+    // ── Extract bullets with continuation merging ─────────────────────────
+    // PDFs often wrap long bullet lines across two lines. We merge continuation lines
+    // (lines that belong to the previous bullet) rather than discarding them.
     const nextDateIdx = dateLineIndices[position + 1] ?? lines.length
-    const bullets = lines.slice(dateIdx + 1, nextDateIdx)
-      .filter(l => isBulletLine(l))
-      .map(l => l.replace(new RegExp(`^[${BULLET_CHARS}\\d.)]+\\s*`), '').trim())
-      .filter(Boolean)
+    const bulletSection = lines.slice(dateIdx + 1, nextDateIdx)
+    const bullets: string[] = []
+    let currentBullet = ''
+    for (const bLine of bulletSection) {
+      const trimmedB = bLine.trim()
+      if (!trimmedB) {
+        // Blank line — end current bullet; don't merge across blank lines
+        if (currentBullet) { bullets.push(currentBullet); currentBullet = '' }
+        continue
+      }
+      if (looksLikeDateRange(bLine) || looksLikeLocation(bLine)) {
+        if (currentBullet) { bullets.push(currentBullet); currentBullet = '' }
+        continue
+      }
+      if (isBulletLine(bLine)) {
+        if (currentBullet) bullets.push(currentBullet)
+        currentBullet = bLine.replace(new RegExp(`^[${BULLET_CHARS}\\d.)]+\\s*`), '').trim()
+      } else if (currentBullet) {
+        // Potential continuation — merge if it looks like wrapped text from the previous bullet.
+        // Safe signals: starts lowercase (e.g. "the USA", "develop strategy"), starts with (/$,
+        // or previous bullet ended mid-word/mid-sentence (no terminal punctuation)
+        const startsLikeContinuation = /^[a-z($\d]/.test(trimmedB)
+        const prevEndsIncomplete = /[a-zA-Z\d]$/.test(currentBullet)
+        // Hard block: lines with parentheses NOT at the start are almost always company name lines
+        // e.g. "AvePoint (Ticker: AV P T ) Jersey City, NJ" — never treat as continuation
+        const isCompanyLike = trimmedB.includes('(') && !trimmedB.startsWith('(')
+        if (!isCompanyLike && (startsLikeContinuation || prevEndsIncomplete)) {
+          currentBullet += ' ' + trimmedB
+        } else {
+          // Looks like a company name or section header — end bullet, discard this line as a bullet
+          bullets.push(currentBullet)
+          currentBullet = ''
+        }
+      }
+    }
+    if (currentBullet) bullets.push(currentBullet)
 
     if (title || company) {
       roles.push({ company, title, start, end, bullets })

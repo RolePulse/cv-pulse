@@ -115,3 +115,43 @@ Biggest structural UX improvement: merged the separate `/results` and `/editor` 
 
 ### Tests
 793 tests, all passing. Zero TypeScript errors. Build clean.
+
+---
+
+## 2026-03-03 — Parser Fixes: Split Bullets, 4-Line Header, Ticker Stripping
+
+**Date:** Tuesday 3 March 2026, ~19:11 GMT
+**Commit:** 3ed7664
+
+### What was fixed (5 issues)
+
+**1. looksLikeLocation trailing whitespace**
+- Added `\s*$` to regex — paranoia fix for any Unicode space not caught by `.trim()`
+
+**2. Split bullets — lone • on its own line**
+- PDFs like AvePoint and GovInvest emit each bullet in two lines: `•` alone, then content on the next line
+- Added a preprocessing pass in `extractExperience()` that merges lone bullet char + next content line before the main parsing loop
+- Guard: no merge if next line is a date, another lone bullet, or lone `o`
+
+**3. `o` sub-bullets — Microsoft Word style**
+- Same preprocessing pass handles `o` (lowercase) as a sub-bullet marker
+- When merging a lone `o`, the result is prefixed with `•` so `isBulletLine()` fires correctly
+
+**4. 4-line header — Company → Location → Title → Date (MongoDB pattern)**
+- Added `rawEffective2` / `skip2` variables to detect when the "title" candidate is actually a location
+- When `skip2=true`: `title = effective1`, `company = effective2` (stepped past the location)
+- Previously this pattern would set title="New York, NY" and company="Senior Engineer" — completely swapped
+
+**5. AvePoint — ticker/city noise in company line**
+- New `cleanCompanyLine()` helper strips: ticker annotations `(Ticker: AVPT)` / `(NYSE: X)` and trailing `City, ST` location suffix (with or without leading comma)
+- Applied when company is extracted from the prev-line search in "Title | Date" inline format
+
+### Files changed
+- `src/lib/parser.ts` — 5 targeted edits
+- `src/lib/__tests__/parser-fixes-march2026.test.ts` — 12 new regression tests (new file)
+
+### Tests
+805 tests, all passing (was 793 — +12 new). Zero TypeScript errors. Build clean.
+
+### Next
+James to re-upload AvePoint, GovInvest, MongoDB CVs to verify live parsing.

@@ -255,13 +255,47 @@ export function extractExperience(text: string): ExperienceRole[] {
 
     // Case A: date range inline — "Company Name   Jan 2020 – Dec 2021"
     const dateStart = dateLine.indexOf(rangeMatch[0])
-    const textBefore = dateLine.slice(0, dateStart).trim().replace(/[|·—,\s]+$/, '').trim()
+    // Detect "Title | Date" inline format: raw text before the date ended with a pipe
+    // e.g. "Enterprise Account Executive | Aug 2024 – Present"
+    //       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ textBefore ^^^^^^^^ date
+    const textBeforeRaw = dateLine.slice(0, dateStart)
+    const endsWithPipe = textBeforeRaw.trimEnd().endsWith('|')
+    const textBefore = textBeforeRaw.trim().replace(/[|·—,\s]+$/, '').trim()
+
+    // Case A: text inline before the date on the same line
     // Guard: must be > 5 chars and not a partial date fragment (e.g. "11/", "Jan", "06/")
-    if (textBefore.length > 5 && !/^\d{1,4}[\/\-]?$/.test(textBefore)) company = textBefore
+    if (textBefore.length > 5 && !/^\d{1,4}[\/\-]?$/.test(textBefore)) {
+      // Detect "Title | Date" vs "Company | Date" format:
+      // If prev1 already has a usable non-date/non-bullet/non-location line (a title above the date),
+      // then the inline text is the COMPANY ("Company | Date" — standard structuredToRawText output).
+      // If prev1 is blank, a location, a bullet, or another date, the inline text IS the TITLE.
+      const prevLine = dateIdx > 0 ? lines[dateIdx - 1] : ''
+      const prevHasTitle = Boolean(
+        prevLine &&
+        !looksLikeDateRange(prevLine) &&
+        !isBulletLine(prevLine) &&
+        !looksLikeLocation(prevLine) &&
+        !looksLikeSeparator(prevLine) &&
+        // Lines with parentheses are almost always company names (e.g. "HiBob (acquired Mosaic)",
+        // "AvePoint (Ticker: AV P T ) Jersey City, NJ"), not job titles — don't treat them as a
+        // title above the date even if they look non-blank.
+        !prevLine.includes('(') &&
+        // Lines ending in "Company - Remote", "Company - Hybrid", "Company – City" are
+        // company+location lines, not job titles.
+        !/\s[-–]\s*(Remote|Hybrid|On-?site|Onsite|In-?person)\s*$/i.test(prevLine)
+      )
+      if (endsWithPipe && !prevHasTitle) {
+        // "Title | Date" format — no title above, so the inline text IS the job title
+        // Company will come from the line(s) above (handled below)
+        title = textBefore
+      } else {
+        company = textBefore
+      }
+    }
 
     // Case B: date at line start — "5/2024-4/2025 GIMMECREDIT, Tarrytown NY"
     // When textBefore is empty, grab the text AFTER the date match as the company
-    if (!company) {
+    if (!company && !title) {
       const textAfter = dateLine.slice(dateStart + rangeMatch[0].length).trim().replace(/^[|·—,\s]+/, '').trim()
       if (textAfter.length > 3 && !/^\d/.test(textAfter)) company = textAfter
     }
@@ -270,28 +304,79 @@ export function extractExperience(text: string): ExperienceRole[] {
     const prev2 = dateIdx > 1 ? lines[dateIdx - 2] : ''
     const prev3 = dateIdx > 2 ? lines[dateIdx - 3] : ''
 
-    // Skip prev1 if it is a bare location line or a lone column-separator char (PDF layout artifact)
-    const skip1 = looksLikeLocation(prev1) || looksLikeSeparator(prev1)
+    // Skip prev1 if it is a bare location, separator, or bullet from the previous role's content
+    const skip1 = looksLikeLocation(prev1) || looksLikeSeparator(prev1) || isBulletLine(prev1)
     const effective1 = skip1 ? prev2 : prev1
     const effective2 = skip1 ? prev3 : prev2
 
-    if (!company) {
-      if (effective1 && (effective1.includes('|') || effective1.includes('·'))) {
-        // "Title | Company" or "Title · Company" — reliable delimiters only
-        // Comma is intentionally excluded: too many false positives with "City, State/Country" location strings
-        const sep = effective1.includes('|') ? '|' : '·'
-        const parts = effective1.split(sep).map(s => s.trim())
-        title = parts[0] || ''
-        company = parts[1] || ''
-      } else if (effective1 && effective2 && !looksLikeDateRange(effective2) && !looksLikeDateRange(effective1)) {
-        // Two separate lines: effective2 = title, effective1 = company (standard UK format)
-        title = effective2
-        company = effective1
-      } else if (effective1 && !looksLikeDateRange(effective1)) {
-        title = effective1
+    if (endsWithPipe) {
+      if (title) {
+        // "Title | Date" — title already set from inline text.
+        // Get company from the nearest usable prev line (skip location/bullet/date).
+        const companyLine = [prev1, prev2].find(
+          l => l && !looksLikeDateRange(l) && !isBulletLine(l) && !looksLikeLocation(l) && !looksLikeSeparator(l)
+        )
+        if (companyLine) company = companyLine
+      } else if (company) {
+        // "Company | Date" — company set from inline text.
+        // Get title from prev1 (the line above, e.g. "Senior SDR").
+        if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocation(prev1) && !looksLikeSeparator(prev1) && !isBulletLine(prev1)) {
+          title = prev1
+        }
       }
-    } else if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocation(prev1) && !looksLikeSeparator(prev1)) {
-      title = prev1
+    } else if (!company) {
+      // No inline company — look for title + company
+
+      // FORWARD-LOOK FIRST when the date sits on its own line (nothing inline before or after).
+      // Date-first format: DATE\nCOMPANY - TITLE\n● bullets  (e.g. Aaron Sheppard style)
+      // We prefer forward over backward here because the line above is often a bullet continuation
+      // from the previous role's content, not a job title.
+      if (textBefore.length === 0) {
+        for (let offset = 1; offset <= 2; offset++) {
+          const nextLine = lines[dateIdx + offset]?.trim() ?? ''
+          if (!nextLine) continue
+          if (isBulletLine(nextLine) || looksLikeDateRange(nextLine)) break
+          // "Company, Location - Title" pattern
+          if (/ - /.test(nextLine) && !nextLine.startsWith('-')) {
+            const dashIdx = nextLine.lastIndexOf(' - ')
+            const companyPart = nextLine.slice(0, dashIdx).trim()
+            const titlePart = nextLine.slice(dashIdx + 3).trim()
+            // Strip location suffix: "Novisto, Remote" → "Novisto"
+            company = companyPart.includes(',') ? companyPart.split(',')[0].trim() : companyPart
+            title = titlePart
+          } else {
+            company = nextLine
+          }
+          break
+        }
+      }
+
+      // BACKWARD LOOK — runs when forward found nothing, or date had inline text (textBefore non-empty)
+      if (!company && !title) {
+        if (effective1 && !isBulletLine(effective1) && (effective1.includes('|') || effective1.includes('·'))) {
+          // "Title | Company" or "Title · Company" — reliable delimiters only
+          // Comma is intentionally excluded: too many false positives with "City, State/Country" location strings
+          const sep = effective1.includes('|') ? '|' : '·'
+          const parts = effective1.split(sep).map(s => s.trim())
+          title = parts[0] || ''
+          company = parts[1] || ''
+        } else if (
+          effective1 && effective2 &&
+          !isBulletLine(effective1) && !isBulletLine(effective2) &&
+          !looksLikeDateRange(effective2) && !looksLikeDateRange(effective1)
+        ) {
+          // Two separate lines: effective2 = title, effective1 = company (standard UK format)
+          title = effective2
+          company = effective1
+        } else if (effective1 && !isBulletLine(effective1) && !looksLikeDateRange(effective1)) {
+          title = effective1
+        }
+      }
+    } else if (!title) {
+      // Company was set from inline text (non-pipe format) — get title from line above
+      if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocation(prev1) && !looksLikeSeparator(prev1) && !isBulletLine(prev1)) {
+        title = prev1
+      }
     }
 
     // ── Extract bullets forward ────────────────────────────────────────────

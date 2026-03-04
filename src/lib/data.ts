@@ -131,11 +131,16 @@ export async function incrementUsage(
 
 /**
  * Check if a user has exceeded their free usage limits.
+ *
+ * Option C paywall model:
+ * - Re-scores: unlimited for all users — never paywalled
+ * - JD checks: 2 free, then paywalled
+ * - Second CV upload: gated directly in /api/upload (not tracked via Usage)
  */
 export function isPaywalled(usage: Usage, action: 'rescore' | 'jd_check'): boolean {
   if (usage.paid_status !== 'free') return false
 
-  if (action === 'rescore') return usage.free_rescores_used >= 1
+  if (action === 'rescore') return false  // unlimited re-scores (Option C)
   if (action === 'jd_check') return usage.free_jd_checks_used >= 2
 
   return false

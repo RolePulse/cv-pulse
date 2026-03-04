@@ -17,6 +17,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Sign in required' }, { status: 401 })
   }
 
+  // ── Second-upload gate (Option C) ─────────────────────────────────────────
+  // Free users can upload and fully work one CV (unlimited re-scores).
+  // A second upload requires paid status.
+  const { count: cvCount } = await supabase
+    .from('cvs')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+
+  if ((cvCount ?? 0) >= 1) {
+    const { data: usage } = await supabase
+      .from('usage')
+      .select('paid_status')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const isPaid = usage?.paid_status !== 'free'
+
+    if (!isPaid) {
+      await supabase.from('events').insert({
+        event_name: 'paywall_hit',
+        user_id: user.id,
+        meta_json: { action: 'second_upload', cv_count: cvCount },
+      })
+      return NextResponse.json(
+        {
+          error: 'paywall',
+          action: 'second_upload',
+          message: 'Upgrade to score additional CVs.',
+        },
+        { status: 402 }
+      )
+    }
+  }
+
   // ── Parse ─────────────────────────────────────────────────────────────────
   let result
 

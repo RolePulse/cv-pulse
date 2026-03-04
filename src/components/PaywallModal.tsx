@@ -12,17 +12,18 @@ import Button from '@/components/Button'
 interface PaywallModalProps {
   isOpen: boolean
   onClose: () => void
-  action: 'rescore' | 'jd_check'
+  action: 'jd_check' | 'second_upload'
 }
 
 const COPY = {
-  rescore: {
-    title: 'Upgrade to re-score',
-    limit: '1 free re-score',
+  second_upload: {
+    title: 'Upgrade to score more CVs',
+    limit: '1 free CV',
     description:
-      'You\'ve used your 1 free re-score. Upgrade to unlock unlimited re-scores so you can keep iterating until your CV is ready.',
+      'You\'ve fully scored your first CV. Upgrade to upload and score additional CVs — useful if you\'re applying with multiple versions or targeting different roles.',
     benefits: [
-      'Unlimited re-scores — iterate until you pass',
+      'Score multiple CV versions',
+      'Unlimited re-scores on every CV',
       'Unlimited JD checks — tailor your CV to every role',
       'Priority support',
     ],
@@ -34,7 +35,8 @@ const COPY = {
       'You\'ve used your 2 free JD checks. Upgrade to run unlimited JD match checks across as many roles as you apply to.',
     benefits: [
       'Unlimited JD checks — tailor your CV to every role',
-      'Unlimited re-scores — iterate until you pass',
+      'Unlimited re-scores on every CV',
+      'Score multiple CV versions',
       'Priority support',
     ],
   },

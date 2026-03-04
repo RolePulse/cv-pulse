@@ -7,7 +7,6 @@ import Header from '@/components/Header'
 import ProgressIndicator from '@/components/ProgressIndicator'
 import Button from '@/components/Button'
 import AlertBanner from '@/components/AlertBanner'
-import PaywallModal from '@/components/PaywallModal'
 import { createClient } from '@/lib/supabase/client'
 import { ROLE_LABELS } from '@/lib/roleDetect'
 import type { StructuredCV, ExperienceRole, EducationEntry } from '@/types/database'
@@ -788,7 +787,6 @@ function ScorePageContent() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [isRescoring, setIsRescoring] = useState(false)
   const [availableFixes, setAvailableFixes] = useState<AvailableFix[]>([])
-  const [paywallOpen, setPaywallOpen] = useState(false)
   const [showPassBanner, setShowPassBanner] = useState(false)
   const [newlyResolvedIds, setNewlyResolvedIds] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'edit' | 'score'>('score')
@@ -925,11 +923,6 @@ function ScorePageContent() {
         method: 'POST',
         headers: { 'x-force-rescore': 'true' },
       })
-      if (res.status === 402) {
-        setPaywallOpen(true)
-        setIsRescoring(false)
-        return
-      }
       if (!res.ok) { setIsRescoring(false); return }
       const data = await res.json() as { result: ScoreResult }
       const newResult = data.result
@@ -1144,7 +1137,6 @@ function ScorePageContent() {
         </Button>
       </div>
 
-      <PaywallModal isOpen={paywallOpen} onClose={() => setPaywallOpen(false)} action="rescore" />
     </main>
   )
 }

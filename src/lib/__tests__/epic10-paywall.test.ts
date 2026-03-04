@@ -1,7 +1,10 @@
 // CV Pulse — Paywall + Usage gate tests
-// Epic 10 | Tests: isPaywalled logic, CSV parser, usage tracking rules.
+// Option C | Tests: isPaywalled logic (re-scores unlimited; JD checks gated), CSV parser.
 //
-// Level: medium (9 checks)
+// Option C paywall model:
+//   - Re-scores: unlimited for all users — never paywalled
+//   - JD checks: 2 free, then paywalled
+//   - Second CV upload: gated in /api/upload (not via isPaywalled helper)
 
 import { describe, it, expect } from 'vitest'
 import { isPaywalled } from '@/lib/data'
@@ -21,18 +24,18 @@ function makeUsage(overrides: Partial<Usage> = {}): Usage {
   }
 }
 
-describe('Epic 10 — isPaywalled()', () => {
+describe('Option C — isPaywalled() re-score rules', () => {
 
   it('1. Free user with 0 rescores used is NOT paywalled for rescore', () => {
     expect(isPaywalled(makeUsage({ free_rescores_used: 0 }), 'rescore')).toBe(false)
   })
 
-  it('2. Free user with 1 rescore used IS paywalled for rescore', () => {
-    expect(isPaywalled(makeUsage({ free_rescores_used: 1 }), 'rescore')).toBe(true)
+  it('2. Free user with 1 rescore used is still NOT paywalled for rescore (unlimited)', () => {
+    expect(isPaywalled(makeUsage({ free_rescores_used: 1 }), 'rescore')).toBe(false)
   })
 
-  it('3. Free user with 2+ rescores used IS paywalled for rescore', () => {
-    expect(isPaywalled(makeUsage({ free_rescores_used: 5 }), 'rescore')).toBe(true)
+  it('3. Free user with many rescores used is NEVER paywalled for rescore (unlimited)', () => {
+    expect(isPaywalled(makeUsage({ free_rescores_used: 99 }), 'rescore')).toBe(false)
   })
 
   it('4. Free user with 1 JD check used is NOT paywalled for jd_check', () => {

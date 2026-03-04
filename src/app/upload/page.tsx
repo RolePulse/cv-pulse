@@ -9,6 +9,7 @@ import Button from '@/components/Button'
 import AlertBanner from '@/components/AlertBanner'
 import { createClient } from '@/lib/supabase/client'
 import { ALL_ROLES, ROLE_LABELS, ROLE_DESCRIPTIONS, type TargetRole } from '@/lib/roleDetect'
+import PaywallModal from '@/components/PaywallModal'
 
 type UploadStep = 'idle' | 'parsing' | 'structuring' | 'validating' | 'ready' | 'failed' | 'gate_failed'
 
@@ -39,6 +40,7 @@ export default function UploadPage() {
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [termsError, setTermsError] = useState(false)
   const [selectedRole, setSelectedRole] = useState<TargetRole | null>(null)
+  const [paywallOpen, setPaywallOpen] = useState(false)
 
   // Check auth state on mount
   useEffect(() => {
@@ -103,7 +105,7 @@ export default function UploadPage() {
   }
 
   // Perform the actual upload fetch and return a result object
-  async function doUpload(): Promise<{ ok: boolean; cvId?: string; confidence?: number; failReason?: string; error?: string; _netError?: boolean; _authError?: boolean; _parseError?: boolean }> {
+  async function doUpload(): Promise<{ ok: boolean; cvId?: string; confidence?: number; failReason?: string; error?: string; _netError?: boolean; _authError?: boolean; _parseError?: boolean; _paywallHit?: boolean }> {
     let response: Response
     try {
       if (file) {
@@ -122,6 +124,7 @@ export default function UploadPage() {
     }
 
     if (response.status === 401) return { ok: false, _authError: true }
+    if (response.status === 402) return { ok: false, _paywallHit: true }
 
     try {
       return await response.json()
@@ -160,6 +163,11 @@ export default function UploadPage() {
     if (data._parseError) {
       setStep('failed')
       setError('Unexpected response from the server — please try again.')
+      return
+    }
+    if (data._paywallHit) {
+      setStep('idle')
+      setPaywallOpen(true)
       return
     }
 
@@ -506,6 +514,8 @@ export default function UploadPage() {
           <Link href="/privacy" className="hover:text-[#222222] transition-colors">Privacy</Link>
         </div>
       </footer>
+
+      <PaywallModal isOpen={paywallOpen} onClose={() => setPaywallOpen(false)} action="second_upload" />
     </div>
   )
 }

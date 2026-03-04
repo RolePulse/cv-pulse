@@ -206,3 +206,65 @@ describe('cleanCompanyLine — ticker and location stripping', () => {
     expect(roles[0].title).toBe('Senior Customer Success Manager')
   })
 })
+
+// ─── Fix 6: Multiple roles under one company header (extended lookback) ──────
+// Pattern: company name appears once, multiple "Title | Date" entries follow.
+// Previously: only prev1/prev2 checked → continuation roles got company = "".
+// Fixed: lookback up to 12 lines, skipping date-range lines.
+
+describe('multiple roles under one company header', () => {
+  it('extracts titles correctly and does not store title as company', () => {
+    const text = [
+      'EXPERIENCE',
+      'AvePoint (Ticker: AVPT) Jersey City, NJ',
+      'Enterprise Account Executive | Dec 2020 – Aug 2024',
+      '• Led enterprise sales across Mid-Atlantic region',
+      '',
+      'Enterprise Account Executive | Jan 2020 – Dec 2020',
+      '• Managed 40 accounts across financial services vertical',
+      '',
+      'Enterprise Account Executive | Sep 2018 – Nov 2019',
+      '• Drove pipeline expansion by 35%',
+    ].join('\n')
+
+    const roles = extractExperience(text)
+    expect(roles).toHaveLength(3)
+
+    // No role should store a job title as the company
+    roles.forEach(r => {
+      expect(r.title).not.toBe('')
+      expect(r.company).not.toBe(r.title)
+    })
+
+    // All three roles should correctly identify the title
+    expect(roles[0].title).toBe('Enterprise Account Executive')
+    expect(roles[1].title).toBe('Enterprise Account Executive')
+    expect(roles[2].title).toBe('Enterprise Account Executive')
+
+    // Role 0 (first role under company) must have company set
+    expect(roles[0].company).toMatch(/AvePoint/i)
+
+    // Continuation roles (1, 2) should inherit the company via extended lookback
+    expect(roles[1].company).toMatch(/AvePoint/i)
+    expect(roles[2].company).toMatch(/AvePoint/i)
+  })
+
+  it('does not inherit company across a section header boundary', () => {
+    const text = [
+      'EXPERIENCE',
+      'TechCorp Ltd',
+      'Sales Manager | Jan 2022 – Present',
+      '• Hit 120% quota',
+      '',
+      'EDUCATION',
+      'Account Executive | Jan 2019 – Dec 2021',  // should NOT get TechCorp
+    ].join('\n')
+
+    const roles = extractExperience(text)
+    // The AE entry under EDUCATION should not inherit TechCorp as its company
+    const aeRole = roles.find(r => r.title === 'Account Executive')
+    if (aeRole) {
+      expect(aeRole.company).not.toMatch(/TechCorp/i)
+    }
+  })
+})

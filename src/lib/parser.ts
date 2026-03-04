@@ -391,11 +391,24 @@ export function extractExperience(text: string): ExperienceRole[] {
     if (endsWithPipe) {
       if (title) {
         // "Title | Date" — title already set from inline text.
-        // Get company from the nearest usable prev line (skip location/bullet/date).
-        // Then clean ticker annotations and trailing location noise from the raw company line.
-        const companyLine = [prev1, prev2].find(
-          l => l && !looksLikeDateRange(l) && !isBulletLine(l) && !looksLikeLocation(l) && !looksLikeSeparator(l)
-        )
+        // Get company from the nearest usable prev line (skip location/bullet/date/other-date-lines).
+        // Extended lookback (up to 12 lines) handles "multiple roles under one company header":
+        //   AvePoint                          ← company (6+ lines back)
+        //   Enterprise AE | Dec 2020 – Aug 2024  ← date line — skip, don't stop
+        //   • bullets                         ← skip
+        //   Enterprise AE | Jan 2020 – Dec 2020  ← current line
+        // Stop at section headers (all-caps words: EXPERIENCE, EDUCATION, etc.)
+        let companyLine = ''
+        for (let back = 1; back <= 12; back++) {
+          const ln = (dateIdx - back) >= 0 ? lines[dateIdx - back] : ''
+          if (!ln.trim()) continue
+          if (/^[A-Z][A-Z\s&\/\-]{3,}$/.test(ln.trim())) break  // section header → stop
+          if (looksLikeSeparator(ln) || isBulletLine(ln)) continue
+          if (looksLikeLocation(ln)) continue
+          if (looksLikeDateRange(ln)) continue  // skip date-range lines (same-company continuation)
+          companyLine = ln
+          break
+        }
         if (companyLine) company = cleanCompanyLine(companyLine)
       } else if (company) {
         // "Company | Date" — company set from inline text.

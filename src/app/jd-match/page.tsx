@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import Header from '@/components/Header'
 import Button from '@/components/Button'
 import AlertBanner from '@/components/AlertBanner'
@@ -207,6 +208,17 @@ function JDMatchContent() {
       <Header isSignedIn />
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
+        {/* Back navigation */}
+        <div className="mb-6">
+          <Link
+            href={resolvedCvId ? `/score?cvId=${resolvedCvId}` : '/upload'}
+            className="inline-flex items-center gap-1.5 text-sm text-[#888888] hover:text-[#FF6B00] transition-colors"
+          >
+            <span className="text-base leading-none">←</span>
+            <span>Back to score</span>
+          </Link>
+        </div>
+
         <h1 className="text-2xl font-bold text-[#222222] mb-2 text-center">JD Match</h1>
         <p className="text-[#444444] text-center text-sm mb-2">
           Paste a job description to see how well your CV matches it. We'll surface missing keywords and give you a fit score.

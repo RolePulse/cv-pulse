@@ -136,6 +136,17 @@ export default function SettingsPage() {
       <Header isSignedIn />
 
       <main className="max-w-xl mx-auto px-4 sm:px-6 py-12">
+        {/* Back navigation */}
+        <div className="mb-6">
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-1.5 text-sm text-[#888888] hover:text-[#FF6B00] transition-colors cursor-pointer"
+          >
+            <span className="text-base leading-none">←</span>
+            <span>Back</span>
+          </button>
+        </div>
+
         <h1 className="text-2xl font-bold text-[#222222] mb-8">Settings</h1>
 
         {/* Error banner */}

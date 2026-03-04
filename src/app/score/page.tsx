@@ -13,6 +13,7 @@ import type { StructuredCV, ExperienceRole, EducationEntry } from '@/types/datab
 import type { ScoreResult } from '@/lib/scorer'
 import { detectAvailableFixes, applyFix } from '@/lib/cvFixes'
 import type { AvailableFix } from '@/lib/cvFixes'
+import SkillTagInput from '@/components/SkillTagInput'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -664,7 +665,7 @@ function EditorPanel({
   saveStatus: SaveStatus
   onSummaryChange: (v: string) => void
   onRoleChange: (i: number, r: ExperienceRole) => void
-  onSkillsChange: (raw: string) => void
+  onSkillsChange: (skills: string[]) => void
   onEducationChange: (i: number, e: EducationEntry) => void
   onCertsChange: (raw: string) => void
   cvId: string
@@ -709,8 +710,8 @@ function EditorPanel({
       {cv.skills !== undefined && (
         <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-5" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide mb-3">Skills</h2>
-          <EditableText value={cv.skills.join(', ')} onChange={onSkillsChange} placeholder="Salesforce, HubSpot, Gainsight…" rows={2} />
-          <p className="text-[10px] text-[#BBBBBB] mt-1.5">Comma-separated. Used in ATS keyword matching.</p>
+          <SkillTagInput value={cv.skills} onChange={onSkillsChange} placeholder="Salesforce, HubSpot, Gainsight…" />
+          <p className="text-[10px] text-[#BBBBBB] mt-1.5">Press Enter or comma to add. Click × to remove.</p>
         </div>
       )}
 
@@ -939,8 +940,7 @@ function ScorePageContent() {
     const experience = [...(cv?.experience ?? [])]; experience[index] = role
     const u = { ...cv!, experience }; setCV(u); scheduleSave(u)
   }
-  const updateSkills = (raw: string) => {
-    const skills = raw.split(/[,\n]+/).map((s) => s.trim()).filter(Boolean)
+  const updateSkills = (skills: string[]) => {
     const u = { ...cv!, skills }; setCV(u); scheduleSave(u)
   }
   const updateEducation = (index: number, edu: EducationEntry) => {

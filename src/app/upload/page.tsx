@@ -227,7 +227,7 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen bg-[#FFF7F2]">
-      <Header />
+      <Header isSignedIn={isSignedIn === true} />
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
         {/* Progress */}

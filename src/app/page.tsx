@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Header from '@/components/Header'
 import Button from '@/components/Button'
+import { createClient } from '@/lib/supabase/server'
 
 const features = [
   {
@@ -39,10 +40,14 @@ const features = [
   },
 ]
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const isSignedIn = !!user
+
   return (
     <div className="min-h-screen bg-[#FFF7F2]">
-      <Header />
+      <Header isSignedIn={isSignedIn} />
 
       {/* Hero */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-20 pb-16 text-center">

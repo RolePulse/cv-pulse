@@ -130,7 +130,7 @@ function SelectRoleContent() {
   if (isLoading) {
     return (
       <main className="min-h-screen bg-[#FFF7F2] flex flex-col">
-        <Header />
+        <Header isSignedIn />
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <div className="w-8 h-8 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin" />
@@ -143,7 +143,7 @@ function SelectRoleContent() {
 
   return (
     <main className="min-h-screen bg-[#FFF7F2] flex flex-col">
-      <Header />
+      <Header isSignedIn />
 
       <div className="max-w-2xl mx-auto w-full px-4 py-8 flex flex-col gap-8">
         {/* Progress */}

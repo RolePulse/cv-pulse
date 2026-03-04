@@ -373,6 +373,7 @@ function cleanRoleLabel(title: string, company: string, index: number): string {
     .replace(/^[•●▪▸\-\*]\s*/, '')   // strip leading bullet chars
     .replace(/\s*\|.*$/, '')           // strip "| City, State" or "| Job Title" suffix
     .replace(/,\s*(LLC|Inc|Ltd|Corp|Co\.?)\s*$/i, '')
+    .replace(/\s*\(+\s*$/, '')         // strip trailing unclosed parenthesis e.g. "Bazaarvoice Ltd ("
     .trim()
   const isBadCompany =
     !c ||

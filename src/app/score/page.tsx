@@ -409,6 +409,7 @@ function ScorePanel({
   onApplyFix,
   hideMobileRescore = false,
   isDemo = false,
+  noChangeFlash = false,
 }: {
   result: ScoreResult
   initialScore: number
@@ -422,6 +423,7 @@ function ScorePanel({
   onApplyFix: (id: AvailableFix['id']) => void
   hideMobileRescore?: boolean
   isDemo?: boolean
+  noChangeFlash?: boolean
 }) {
   const [keywordsOpen, setKeywordsOpen] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
@@ -513,6 +515,9 @@ function ScorePanel({
             </p>
             {improved && (
               <p className="text-xs font-semibold text-[#FF6B00]">{initialScore} → {overallScore}</p>
+            )}
+            {noChangeFlash && (
+              <p className="text-xs font-medium text-[#D97706]">Score unchanged — try a checklist fix ↓</p>
             )}
             <p className="text-[11px] text-[#888888] text-center leading-relaxed max-w-[200px]">{contextHint}</p>
           </div>
@@ -808,6 +813,7 @@ function ScorePageContent() {
   const [isRescoring, setIsRescoring] = useState(false)
   const [availableFixes, setAvailableFixes] = useState<AvailableFix[]>([])
   const [showPassBanner, setShowPassBanner] = useState(false)
+  const [noChangeFlash, setNoChangeFlash] = useState(false)
   const [newlyResolvedIds, setNewlyResolvedIds] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'edit' | 'score'>('score')
 
@@ -961,6 +967,12 @@ function ScorePageContent() {
         if (!oldResult.passFail && newResult.passFail) {
           setShowPassBanner(true)
         }
+
+        // Score unchanged after re-score
+        if (oldResult.overallScore === newResult.overallScore) {
+          setNoChangeFlash(true)
+          setTimeout(() => setNoChangeFlash(false), 3500)
+        }
       }
 
       resultRef.current = newResult
@@ -1049,6 +1061,7 @@ function ScorePageContent() {
     cvId: cvId ?? 'demo',
     showPassBanner,
     onDismissPassBanner: () => setShowPassBanner(false),
+    noChangeFlash,
     newlyResolvedIds,
     availableFixes,
     onApplyFix: handleApplyFix,

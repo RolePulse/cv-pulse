@@ -74,3 +74,16 @@ body {
 .card-shadow {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
+
+/* Score ring — delta flash animation */
+@keyframes score-delta-flash {
+  0%   { opacity: 0; transform: translateY(0px) scale(0.8); }
+  15%  { opacity: 1; transform: translateY(-6px) scale(1.1); }
+  60%  { opacity: 1; transform: translateY(-10px) scale(1); }
+  100% { opacity: 0; transform: translateY(-18px) scale(0.95); }
+}
+
+.score-delta-flash {
+  animation: score-delta-flash 1.8s ease-out forwards;
+  pointer-events: none;
+}

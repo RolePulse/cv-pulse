@@ -47,11 +47,77 @@ function barColor(score: number, max: number): string {
 function ScoreRing({ score, pass }: { score: number; pass: boolean }) {
   const r = 52
   const circ = 2 * Math.PI * r
-  const dash = (score / 100) * circ
   const color = pass ? '#16A34A' : score >= 50 ? '#D97706' : '#DC2626'
+
+  const [displayScore, setDisplayScore] = useState(0)
+  const [delta, setDelta] = useState<number | null>(null)
+  const [deltaKey, setDeltaKey] = useState(0)
+
+  const mountedRef  = useRef(false)
+  const prevScoreRef = useRef<number>(0)
+  const animRef     = useRef<number | null>(null)
+
+  useEffect(() => {
+    const isEntrance = !mountedRef.current
+    mountedRef.current = true
+
+    const from     = isEntrance ? 0 : prevScoreRef.current
+    const to       = score
+    const delay    = isEntrance ? 300 : 0
+    const duration = 800
+
+    // Show "+X pts" flash on re-score improvement
+    if (!isEntrance && to > from) {
+      setDelta(to - from)
+      setDeltaKey((k) => k + 1)
+    }
+
+    prevScoreRef.current = to
+
+    // Cancel any in-flight animation
+    if (animRef.current !== null) cancelAnimationFrame(animRef.current)
+
+    let startTime: number | null = null
+
+    const tick = (ts: number) => {
+      if (startTime === null) startTime = ts
+      const elapsed  = ts - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      // Ease-out cubic
+      const eased    = 1 - Math.pow(1 - progress, 3)
+      setDisplayScore(Math.round(from + (to - from) * eased))
+      if (progress < 1) {
+        animRef.current = requestAnimationFrame(tick)
+      } else {
+        animRef.current = null
+      }
+    }
+
+    const timerId = setTimeout(() => {
+      animRef.current = requestAnimationFrame(tick)
+    }, delay)
+
+    return () => {
+      clearTimeout(timerId)
+      if (animRef.current !== null) cancelAnimationFrame(animRef.current)
+    }
+  }, [score]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const dash = (displayScore / 100) * circ
 
   return (
     <div className="relative inline-flex items-center justify-center">
+      {/* "+X pts" delta flash */}
+      {delta !== null && (
+        <span
+          key={deltaKey}
+          className="score-delta-flash absolute -top-7 text-sm font-bold text-[#16A34A]"
+          onAnimationEnd={() => setDelta(null)}
+        >
+          +{delta} pts
+        </span>
+      )}
+
       <svg width="130" height="130" className="-rotate-90">
         <circle cx="65" cy="65" r={r} fill="none" stroke="#F0F0F0" strokeWidth="10" />
         <circle
@@ -59,11 +125,11 @@ function ScoreRing({ score, pass }: { score: number; pass: boolean }) {
           stroke={color} strokeWidth="10"
           strokeDasharray={`${dash} ${circ}`}
           strokeLinecap="round"
-          style={{ transition: 'stroke-dasharray 0.6s ease' }}
         />
       </svg>
+
       <div className="absolute flex flex-col items-center">
-        <span className="text-3xl font-bold text-[#222222] leading-none">{score}</span>
+        <span className="text-3xl font-bold text-[#222222] leading-none">{displayScore}</span>
         <span className="text-xs text-[#999999] mt-0.5">/ 100</span>
       </div>
     </div>

@@ -6,7 +6,9 @@ import Header from '@/components/Header'
 import ProgressIndicator from '@/components/ProgressIndicator'
 import Button from '@/components/Button'
 import AlertBanner from '@/components/AlertBanner'
+import CVPreviewHtml from '@/components/CVPreviewHtml'
 import { createClient } from '@/lib/supabase/client'
+import type { StructuredCV } from '@/types/database'
 
 // ── Template definitions ──────────────────────────────────────────────────────
 
@@ -15,69 +17,11 @@ const TEMPLATES = [
     id: 'classic' as const,
     name: 'Clean Classic',
     description: 'Single column, ATS-safe, timeless. Works for every role and ATS system.',
-    preview: (
-      <div className="flex flex-col gap-1.5 p-4">
-        {/* Name bar */}
-        <div className="h-4 bg-[#222222] rounded-sm w-36" />
-        {/* Contact line */}
-        <div className="h-2 bg-[#CCCCCC] rounded-sm w-48" />
-        {/* Divider */}
-        <div className="h-px bg-[#CCCCCC] w-full my-1" />
-        {/* Section heading */}
-        <div className="h-2 bg-[#444444] rounded-sm w-16" />
-        {/* Role */}
-        <div className="flex justify-between mt-0.5">
-          <div className="h-2 bg-[#222222] rounded-sm w-28" />
-          <div className="h-2 bg-[#BBBBBB] rounded-sm w-16" />
-        </div>
-        <div className="h-2 bg-[#DDDDDD] rounded-sm w-24" />
-        {/* Bullets */}
-        {[40, 52, 44].map((w, i) => (
-          <div key={i} className="flex gap-1 items-center">
-            <div className="h-1 w-1 rounded-full bg-[#444444] flex-shrink-0" />
-            <div className={`h-1.5 bg-[#DDDDDD] rounded-sm`} style={{ width: `${w}%` }} />
-          </div>
-        ))}
-        {/* Second section */}
-        <div className="h-2 bg-[#444444] rounded-sm w-16 mt-2" />
-        <div className="h-2 bg-[#DDDDDD] rounded-sm w-full" />
-        <div className="h-2 bg-[#DDDDDD] rounded-sm w-3/4" />
-      </div>
-    ),
   },
   {
     id: 'modern' as const,
     name: 'Modern Minimal',
     description: 'Single column, ATS-safe, contemporary styling with a clean accent line.',
-    preview: (
-      <div className="flex flex-col gap-1.5 p-4">
-        {/* Name bar — orange */}
-        <div className="h-5 bg-[#FF6B00] rounded-sm w-40" />
-        {/* Contact line */}
-        <div className="h-2 bg-[#CCCCCC] rounded-sm w-48" />
-        {/* Orange divider */}
-        <div className="h-0.5 bg-[#FF6B00] w-full mt-1 mb-1" />
-        {/* Section heading — orange */}
-        <div className="h-2 bg-[#FF6B00] rounded-sm w-16 opacity-80" />
-        {/* Role */}
-        <div className="flex justify-between mt-0.5">
-          <div className="h-2 bg-[#1A1A1A] rounded-sm w-28" />
-          <div className="h-2 bg-[#BBBBBB] rounded-sm w-16" />
-        </div>
-        <div className="h-2 bg-[#CCCCCC] rounded-sm w-24" />
-        {/* Bullets with orange dash */}
-        {[42, 50, 38].map((w, i) => (
-          <div key={i} className="flex gap-1 items-center">
-            <div className="h-1.5 w-1.5 bg-[#FF6B00] rounded-sm flex-shrink-0" />
-            <div className={`h-1.5 bg-[#DDDDDD] rounded-sm`} style={{ width: `${w}%` }} />
-          </div>
-        ))}
-        {/* Second section heading */}
-        <div className="h-2 bg-[#FF6B00] rounded-sm w-14 mt-2 opacity-80" />
-        <div className="h-2 bg-[#DDDDDD] rounded-sm w-full" />
-        <div className="h-2 bg-[#DDDDDD] rounded-sm w-2/3" />
-      </div>
-    ),
   },
 ]
 
@@ -88,6 +32,7 @@ function ExportContent() {
   const cvId = searchParams.get('cv')
 
   const [resolvedCvId, setResolvedCvId] = useState<string | null>(cvId)
+  const [cvData, setCvData] = useState<{ structured: StructuredCV; rawText: string } | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
@@ -119,6 +64,19 @@ function ExportContent() {
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.shareUrl) setShareUrl(data.shareUrl) })
       .catch(() => { /* non-fatal — share link is optional */ })
+  }, [resolvedCvId])
+
+  // Fetch CV data for live preview
+  useEffect(() => {
+    if (!resolvedCvId) return
+    fetch(`/api/cv/${resolvedCvId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.structured && data?.rawText) {
+          setCvData({ structured: data.structured, rawText: data.rawText })
+        }
+      })
+      .catch(() => { /* non-fatal — preview falls back to skeleton */ })
   }, [resolvedCvId])
 
   async function handleCopy() {
@@ -197,9 +155,32 @@ function ExportContent() {
               className="bg-white rounded-[8px] border border-[#DDDDDD] overflow-hidden"
               style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
             >
-              {/* Preview */}
-              <div className="h-44 bg-[#FAFAFA] border-b border-[#DDDDDD] overflow-hidden">
-                {template.preview}
+              {/* Live preview */}
+              <div
+                className="border-b border-[#DDDDDD] overflow-hidden"
+                style={{ height: '280px' }}
+              >
+                {cvData ? (
+                  <CVPreviewHtml
+                    structured={cvData.structured}
+                    rawText={cvData.rawText}
+                    template={template.id}
+                    previewHeight={280}
+                  />
+                ) : (
+                  // Skeleton while CV data loads
+                  <div className="h-full bg-[#FAFAFA] flex flex-col gap-2 p-4 animate-pulse">
+                    <div className="h-3.5 bg-[#E5E5E5] rounded w-2/5" />
+                    <div className="h-2 bg-[#F0F0F0] rounded w-3/5" />
+                    <div className="h-px bg-[#DDDDDD] my-1" />
+                    <div className="h-2 bg-[#E5E5E5] rounded w-1/4" />
+                    <div className="h-2 bg-[#F0F0F0] rounded w-1/2" />
+                    <div className="h-2 bg-[#F0F0F0] rounded w-2/5" />
+                    <div className="h-2 bg-[#EEEEEE] rounded w-full mt-1" />
+                    <div className="h-2 bg-[#EEEEEE] rounded w-4/5" />
+                    <div className="h-2 bg-[#EEEEEE] rounded w-3/4" />
+                  </div>
+                )}
               </div>
 
               <div className="p-5">

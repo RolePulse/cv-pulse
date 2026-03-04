@@ -40,6 +40,7 @@ export async function GET(
     id: cv.id,
     structured: cv.structured_json,
     targetRole: cv.target_role,
+    rawText: cv.raw_text,
   })
 }
 

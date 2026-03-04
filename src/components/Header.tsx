@@ -38,7 +38,19 @@ export default function Header({ isSignedIn = false }: HeaderProps) {
         {/* Right side */}
         <div className="flex items-center gap-3">
           {isSignedIn ? (
-            <UserNav />
+            <>
+              <Link
+                href="/jd-match"
+                className="hidden sm:inline-flex items-center gap-1.5 text-[13px] font-medium text-[#555555] hover:text-[#FF6B00] transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
+                  <rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M4 4.5h6M4 7h6M4 9.5h3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+                JD Match
+              </Link>
+              <UserNav />
+            </>
           ) : (
             <Button variant="secondary" size="sm">
               <Link href="/upload">Sign in</Link>

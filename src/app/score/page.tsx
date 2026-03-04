@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import Header from '@/components/Header'
 import ProgressIndicator from '@/components/ProgressIndicator'
 import Button from '@/components/Button'
@@ -616,6 +617,23 @@ function ScorePanel({
           )}
         </div>
       )}
+
+      {/* JD Match CTA */}
+      <Link
+        href={`/jd-match?cv=${cvId}`}
+        className="block bg-[#FFFAF7] rounded-[8px] border border-[#FFD4B3] p-4 mb-3 hover:border-[#FF6B00] hover:bg-[#FFF0E6] transition-all group"
+        style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[13px] font-semibold text-[#222222] mb-0.5">Have a specific job in mind?</p>
+            <p className="text-[11px] text-[#888888] leading-relaxed">Paste the JD — see exactly where you match and what&apos;s missing.</p>
+          </div>
+          <span className="text-[#FF6B00] text-sm font-semibold whitespace-nowrap flex-shrink-0 group-hover:translate-x-0.5 transition-transform">
+            Check fit →
+          </span>
+        </div>
+      </Link>
 
       {/* Share (collapsible) */}
       <div className="bg-white rounded-[8px] border border-[#DDDDDD] overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>

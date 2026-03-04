@@ -403,6 +403,8 @@ function ScorePanel({
   showPassBanner,
   onDismissPassBanner,
   newlyResolvedIds,
+  availableFixes,
+  onApplyFix,
 }: {
   result: ScoreResult
   initialScore: number
@@ -412,6 +414,8 @@ function ScorePanel({
   showPassBanner: boolean
   onDismissPassBanner: () => void
   newlyResolvedIds: Set<string>
+  availableFixes: AvailableFix[]
+  onApplyFix: (id: AvailableFix['id']) => void
 }) {
   const [keywordsOpen, setKeywordsOpen] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
@@ -528,6 +532,23 @@ function ScorePanel({
           })}
         </div>
 
+        {/* Fixes remaining */}
+        {checklist.filter(i => !i.done).length > 0 && (
+          <p className="text-xs text-[#888888] mb-3">
+            <span className="font-semibold text-[#222222]">{checklist.filter(i => !i.done).length}</span> fix{checklist.filter(i => !i.done).length === 1 ? '' : 'es'} remaining — apply below, then re-score
+          </p>
+        )}
+
+        {/* Quick fixes */}
+        {availableFixes.length > 0 && (
+          <div className="mb-4">
+            <QuickFixesPanel fixes={availableFixes} onApply={onApplyFix} />
+          </div>
+        )}
+
+        {/* Separator */}
+        <div className="border-t border-[#EEEEEE] mb-4" />
+
         {/* Re-score button */}
         <Button variant="primary" size="md" className="w-full justify-center" onClick={onRescore} disabled={isRescoring}>
           {isRescoring ? (
@@ -628,24 +649,20 @@ function ScorePanel({
 function EditorPanel({
   cv,
   saveStatus,
-  availableFixes,
   onSummaryChange,
   onRoleChange,
   onSkillsChange,
   onEducationChange,
   onCertsChange,
-  onApplyFix,
   cvId,
 }: {
   cv: StructuredCV
   saveStatus: SaveStatus
-  availableFixes: AvailableFix[]
   onSummaryChange: (v: string) => void
   onRoleChange: (i: number, r: ExperienceRole) => void
   onSkillsChange: (raw: string) => void
   onEducationChange: (i: number, e: EducationEntry) => void
   onCertsChange: (raw: string) => void
-  onApplyFix: (id: AvailableFix['id']) => void
   cvId: string
 }) {
   const router = useRouter()
@@ -663,9 +680,6 @@ function EditorPanel({
 
       {/* Placeholder reminder */}
       {placeholders > 0 && <PlaceholderReminder count={placeholders} />}
-
-      {/* Quick fixes */}
-      <QuickFixesPanel fixes={availableFixes} onApply={onApplyFix} />
 
       {/* Summary */}
       {cv.summary !== undefined && (
@@ -993,6 +1007,8 @@ function ScorePageContent() {
               showPassBanner={showPassBanner}
               onDismissPassBanner={() => setShowPassBanner(false)}
               newlyResolvedIds={newlyResolvedIds}
+              availableFixes={availableFixes}
+              onApplyFix={handleApplyFix}
             />
           </div>
 
@@ -1001,13 +1017,11 @@ function ScorePageContent() {
             <EditorPanel
               cv={cv}
               saveStatus={saveStatus}
-              availableFixes={availableFixes}
               onSummaryChange={updateSummary}
               onRoleChange={updateRole}
               onSkillsChange={updateSkills}
               onEducationChange={updateEducation}
               onCertsChange={updateCerts}
-              onApplyFix={handleApplyFix}
               cvId={cvId!}
             />
           </div>

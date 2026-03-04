@@ -87,3 +87,16 @@ body {
   animation: score-delta-flash 1.8s ease-out forwards;
   pointer-events: none;
 }
+
+/* Checklist item — resolved flash */
+@keyframes checklist-resolve-flash {
+  0%   { background-color: transparent; }
+  15%  { background-color: #DCFCE7; }
+  70%  { background-color: #DCFCE7; }
+  100% { background-color: transparent; }
+}
+
+.checklist-resolve-flash {
+  animation: checklist-resolve-flash 2s ease-out forwards;
+  border-radius: 4px;
+}

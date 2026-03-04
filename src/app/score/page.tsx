@@ -138,11 +138,11 @@ function ScoreRing({ score, pass }: { score: number; pass: boolean }) {
 
 // ── Checklist item row ────────────────────────────────────────────────────────
 
-function ChecklistItemRow({ item }: { item: ScoreResult['checklist'][0] }) {
+function ChecklistItemRow({ item, isNewlyResolved }: { item: ScoreResult['checklist'][0]; isNewlyResolved?: boolean }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className={`border-b border-[#F0F0F0] last:border-0 ${item.done ? 'opacity-60' : ''}`}>
+    <div className={`border-b border-[#F0F0F0] last:border-0 ${item.done ? 'opacity-60' : ''} ${isNewlyResolved ? 'checklist-resolve-flash' : ''}`}>
       <button
         onClick={() => setExpanded((v) => !v)}
         className="w-full flex items-start gap-3 py-2.5 text-left cursor-pointer hover:bg-[#FAFAFA] px-1 rounded transition-colors"
@@ -182,9 +182,11 @@ function ChecklistItemRow({ item }: { item: ScoreResult['checklist'][0] }) {
 function ChecklistCategory({
   category,
   items,
+  newlyResolvedIds,
 }: {
   category: string
   items: ScoreResult['checklist']
+  newlyResolvedIds: Set<string>
 }) {
   const [open, setOpen] = useState(category === 'critical' || category === 'impact')
   const done = items.filter((i) => i.done).length
@@ -209,7 +211,7 @@ function ChecklistCategory({
       {open && (
         <div className="px-4 pb-1">
           {items.map((item) => (
-            <ChecklistItemRow key={item.id} item={item} />
+            <ChecklistItemRow key={item.id} item={item} isNewlyResolved={newlyResolvedIds.has(item.id)} />
           ))}
         </div>
       )}
@@ -398,12 +400,18 @@ function ScorePanel({
   isRescoring,
   onRescore,
   cvId,
+  showPassBanner,
+  onDismissPassBanner,
+  newlyResolvedIds,
 }: {
   result: ScoreResult
   initialScore: number
   isRescoring: boolean
   onRescore: () => void
   cvId: string
+  showPassBanner: boolean
+  onDismissPassBanner: () => void
+  newlyResolvedIds: Set<string>
 }) {
   const [keywordsOpen, setKeywordsOpen] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
@@ -415,6 +423,20 @@ function ScorePanel({
   const { overallScore, passFail, criticalConcerns, buckets, checklist, targetRole, keywordData } = result
 
   const improved = initialScore !== overallScore
+
+  // Share trigger — used by both pass banner and the share section below
+  const triggerShare = async () => {
+    if (shareUrl || shareLoading) return
+    setShareLoading(true)
+    setShareError(null)
+    try {
+      const res = await fetch(`/api/cv/${cvId}/share`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok || !data.ok) setShareError(data.error || 'Could not create link')
+      else setShareUrl(data.shareUrl)
+    } catch { setShareError('Network error') }
+    setShareLoading(false)
+  }
   const doneItems = checklist.filter((i) => i.done).length
   const totalItems = checklist.length
 
@@ -432,6 +454,41 @@ function ScorePanel({
 
   return (
     <div className="space-y-0">
+      {/* Threshold banner — shown once when score first crosses 70 */}
+      {showPassBanner && (
+        <div className="mb-3 rounded-[8px] bg-green-50 border border-green-200 p-4">
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <p className="text-sm font-semibold text-[#16A34A]">🎉 You&apos;ve hit the recruiter threshold!</p>
+            <button
+              onClick={onDismissPassBanner}
+              className="text-green-400 hover:text-green-600 text-lg leading-none flex-shrink-0 cursor-pointer"
+              aria-label="Dismiss"
+            >×</button>
+          </div>
+          <p className="text-xs text-[#555555] mb-3 leading-relaxed">
+            Your CV now scores 70+. Recruiters will take it seriously. Share your result.
+          </p>
+          {shareUrl ? (
+            <div className="flex gap-2">
+              <input type="text" readOnly value={shareUrl} className="flex-1 text-xs text-[#444444] bg-white border border-green-200 rounded-md px-2.5 py-1.5 truncate min-w-0" />
+              <button
+                onClick={async () => { await navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+                className="text-xs font-semibold text-white bg-[#16A34A] hover:bg-[#15803D] rounded-[6px] px-3 py-1.5 transition-colors cursor-pointer flex-shrink-0"
+              >{copied ? 'Copied!' : 'Copy'}</button>
+            </div>
+          ) : (
+            <button
+              onClick={triggerShare}
+              disabled={shareLoading}
+              className="text-xs font-semibold text-[#16A34A] border border-green-300 bg-white hover:bg-green-50 rounded-[6px] px-3 py-1.5 transition-colors cursor-pointer disabled:opacity-60"
+            >
+              {shareLoading ? 'Creating link…' : 'Share results →'}
+            </button>
+          )}
+          {shareError && <p className="text-[10px] text-[#DC2626] mt-1.5">{shareError}</p>}
+        </div>
+      )}
+
       {/* Score hero */}
       <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-5 mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
         {/* Ring + badge */}
@@ -490,7 +547,7 @@ function ScorePanel({
           <span className="text-[11px] text-[#999999]">{doneItems}/{totalItems}</span>
         </div>
         {categories.map(({ category, items }) => (
-          <ChecklistCategory key={category} category={category} items={items} />
+          <ChecklistCategory key={category} category={category} items={items} newlyResolvedIds={newlyResolvedIds} />
         ))}
       </div>
 
@@ -538,18 +595,7 @@ function ScorePanel({
       <div className="bg-white rounded-[8px] border border-[#DDDDDD] overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
         {!shareUrl ? (
           <button
-            onClick={async () => {
-              if (shareOpen) { setShareOpen(false); return }
-              setShareLoading(true)
-              setShareError(null)
-              try {
-                const res = await fetch(`/api/cv/${cvId}/share`, { method: 'POST' })
-                const data = await res.json()
-                if (!res.ok || !data.ok) setShareError(data.error || 'Could not create link')
-                else setShareUrl(data.shareUrl)
-              } catch { setShareError('Network error') }
-              setShareLoading(false)
-            }}
+            onClick={triggerShare}
             className="w-full px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-[#FAFAFA] transition-colors"
           >
             <span className="text-[13px] font-semibold text-[#222222]">Share results</span>
@@ -702,9 +748,12 @@ function ScorePageContent() {
   const [isRescoring, setIsRescoring] = useState(false)
   const [availableFixes, setAvailableFixes] = useState<AvailableFix[]>([])
   const [paywallOpen, setPaywallOpen] = useState(false)
+  const [showPassBanner, setShowPassBanner] = useState(false)
+  const [newlyResolvedIds, setNewlyResolvedIds] = useState<Set<string>>(new Set())
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestCV = useRef<StructuredCV | null>(null)
+  const resultRef = useRef<ScoreResult | null>(null)
 
   // ── Load on mount ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -753,6 +802,7 @@ function ScorePageContent() {
         setCV(structured)
         latestCV.current = structured
         setResult(scoreResult)
+        resultRef.current = scoreResult
         setInitialScore(scoreResult.overallScore)
       } catch {
         setError('Network error — please check your connection and try again.')
@@ -827,7 +877,26 @@ function ScorePageContent() {
       }
       if (!res.ok) { setIsRescoring(false); return }
       const data = await res.json() as { result: ScoreResult }
-      setResult(data.result)
+      const newResult = data.result
+      const oldResult = resultRef.current
+
+      if (oldResult) {
+        // Checklist items newly resolved after re-score
+        const prevUnresolved = new Set(oldResult.checklist.filter(i => !i.done).map(i => i.id))
+        const resolved = newResult.checklist.filter(i => i.done && prevUnresolved.has(i.id)).map(i => i.id)
+        if (resolved.length > 0) {
+          setNewlyResolvedIds(new Set(resolved))
+          setTimeout(() => setNewlyResolvedIds(new Set()), 2200)
+        }
+
+        // First-time threshold crossing (below 70 → 70+)
+        if (!oldResult.passFail && newResult.passFail) {
+          setShowPassBanner(true)
+        }
+      }
+
+      resultRef.current = newResult
+      setResult(newResult)
     } catch {
       // fail silently — score stays as-is
     } finally {
@@ -921,6 +990,9 @@ function ScorePageContent() {
               isRescoring={isRescoring}
               onRescore={handleRescore}
               cvId={cvId!}
+              showPassBanner={showPassBanner}
+              onDismissPassBanner={() => setShowPassBanner(false)}
+              newlyResolvedIds={newlyResolvedIds}
             />
           </div>
 

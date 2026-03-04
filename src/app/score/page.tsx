@@ -15,6 +15,7 @@ import type { ScoreResult } from '@/lib/scorer'
 import { detectAvailableFixes, applyFix } from '@/lib/cvFixes'
 import type { AvailableFix } from '@/lib/cvFixes'
 import SkillTagInput from '@/components/SkillTagInput'
+import { DEMO_CV, DEMO_SCORE } from '@/lib/demoData'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -408,6 +409,7 @@ function ScorePanel({
   availableFixes,
   onApplyFix,
   hideMobileRescore = false,
+  isDemo = false,
 }: {
   result: ScoreResult
   initialScore: number
@@ -420,6 +422,7 @@ function ScorePanel({
   availableFixes: AvailableFix[]
   onApplyFix: (id: AvailableFix['id']) => void
   hideMobileRescore?: boolean
+  isDemo?: boolean
 }) {
   const [keywordsOpen, setKeywordsOpen] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
@@ -434,7 +437,7 @@ function ScorePanel({
 
   // Share trigger — used by both pass banner and the share section below
   const triggerShare = async () => {
-    if (shareUrl || shareLoading) return
+    if (isDemo || shareUrl || shareLoading) return
     setShareLoading(true)
     setShareError(null)
     try {
@@ -556,7 +559,7 @@ function ScorePanel({
         {/* Re-score button — hidden on mobile (bottom bar owns it there) */}
         <div className={hideMobileRescore ? 'hidden lg:block' : ''}>
           <Button variant="primary" size="md" className="w-full justify-center" onClick={onRescore} disabled={isRescoring}>
-            {isRescoring ? (
+            {isDemo ? 'Sign in to score your own CV →' : isRescoring ? (
               <span className="flex items-center gap-2">
                 <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 Scoring…
@@ -775,6 +778,7 @@ function ScorePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const cvId = searchParams.get('cvId')
+  const isDemo = searchParams.get('demo') === 'true'
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -795,6 +799,17 @@ function ScorePageContent() {
 
   // ── Load on mount ─────────────────────────────────────────────────────────
   useEffect(() => {
+    // Demo mode — load hardcoded data, skip auth + API entirely
+    if (isDemo) {
+      setCV(DEMO_CV)
+      latestCV.current = DEMO_CV
+      setResult(DEMO_SCORE)
+      resultRef.current = DEMO_SCORE
+      setInitialScore(DEMO_SCORE.overallScore)
+      setLoading(false)
+      return
+    }
+
     if (!cvId) { router.replace('/upload'); return }
 
     async function load() {
@@ -850,7 +865,7 @@ function ScorePageContent() {
     }
 
     load()
-  }, [cvId, router])
+  }, [cvId, router, isDemo])
 
   // ── Available fixes ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -859,6 +874,7 @@ function ScorePageContent() {
 
   // ── Debounced save ────────────────────────────────────────────────────────
   const scheduleSave = useCallback((updated: StructuredCV) => {
+    if (isDemo) { latestCV.current = updated; setCV(updated); return }
     latestCV.current = updated
     setSaveStatus('saving')
     if (saveTimer.current) clearTimeout(saveTimer.current)
@@ -900,6 +916,7 @@ function ScorePageContent() {
 
   // ── Re-score ──────────────────────────────────────────────────────────────
   const handleRescore = useCallback(async () => {
+    if (isDemo) { router.push('/upload'); return }
     if (!cvId || isRescoring) return
     setIsRescoring(true)
     await flushSave()
@@ -940,7 +957,7 @@ function ScorePageContent() {
     } finally {
       setIsRescoring(false)
     }
-  }, [cvId, isRescoring, flushSave])
+  }, [cvId, isRescoring, isDemo, router, flushSave])
 
   // ── Apply fix ─────────────────────────────────────────────────────────────
   const handleApplyFix = useCallback((fixId: AvailableFix['id']) => {
@@ -1008,13 +1025,14 @@ function ScorePageContent() {
     initialScore,
     isRescoring,
     onRescore: handleRescore,
-    cvId: cvId!,
+    cvId: cvId ?? 'demo',
     showPassBanner,
     onDismissPassBanner: () => setShowPassBanner(false),
     newlyResolvedIds,
     availableFixes,
     onApplyFix: handleApplyFix,
-  } as const
+    isDemo,
+  }
 
   const editorPanelProps = {
     cv,
@@ -1032,10 +1050,27 @@ function ScorePageContent() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <main className="min-h-screen bg-[#FFF7F2] pb-20 lg:pb-0">
-      <Header isSignedIn />
+      <Header isSignedIn={!isDemo} />
+
+      {/* ── Demo banner ── */}
+      {isDemo && (
+        <div className="sticky top-0 z-30 bg-[#FF6B00] text-white px-4 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <p className="text-sm font-medium">
+              👀 This is a demo score for an anonymised CV. Sign in to score your own.
+            </p>
+            <Link
+              href="/upload"
+              className="flex-shrink-0 bg-white text-[#FF6B00] text-sm font-semibold px-4 py-1.5 rounded-full hover:bg-[#FFF7F2] transition-colors"
+            >
+              Score my CV →
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* ── Mobile tab bar ── */}
-      <div className="lg:hidden sticky top-0 z-20 bg-white border-b border-[#DDDDDD]">
+      <div className={`lg:hidden sticky z-20 bg-white border-b border-[#DDDDDD] ${isDemo ? 'top-[52px]' : 'top-0'}`}>
         <div className="max-w-7xl mx-auto px-4 flex">
           <button
             onClick={() => setActiveTab('score')}
@@ -1100,7 +1135,7 @@ function ScorePageContent() {
           <p className="text-[10px] text-[#999999] truncate">{ROLE_LABELS[result.targetRole]}</p>
         </div>
         <Button variant="primary" size="sm" onClick={handleRescore} disabled={isRescoring} className="flex-shrink-0">
-          {isRescoring ? (
+          {isDemo ? 'Sign in →' : isRescoring ? (
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
               Scoring…

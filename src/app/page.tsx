@@ -66,8 +66,14 @@ export default function Home() {
               Score my CV →
             </Button>
           </Link>
-          <span className="text-sm text-[#999999]">Free to start · No card required</span>
+          <Link
+            href="/score?demo=true"
+            className="text-sm font-medium text-[#FF6B00] hover:text-[#E05A00] underline underline-offset-2 transition-colors"
+          >
+            See a demo score first
+          </Link>
         </div>
+        <p className="mt-3 text-xs text-[#BBBBBB]">Free to start · No card required</p>
       </section>
 
       {/* Feature cards */}

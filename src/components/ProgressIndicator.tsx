@@ -17,8 +17,8 @@ const stepOrder: Step[] = ['upload', 'score', 'export']
 
 function getStepHref(key: Step, cvId?: string): string | null {
   if (key === 'upload') return '/upload'
-  if (key === 'score') return cvId ? `/score?id=${cvId}` : null
-  if (key === 'export') return cvId ? `/export?id=${cvId}` : null
+  if (key === 'score') return cvId ? `/score?cvId=${cvId}` : null
+  if (key === 'export') return cvId ? `/export?cv=${cvId}` : null
   return null
 }
 

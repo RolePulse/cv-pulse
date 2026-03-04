@@ -1,11 +1,10 @@
 'use client'
 
 // CV Pulse — Paywall Modal
-// Epic 10 | Shown when a free user hits their usage limit.
-// Stripe is NOT connected in v1 — upgrade CTA is scaffolded only.
-// When Stripe is wired in Epic 16, this component requires no changes —
-// just point the "Upgrade" button at the Stripe checkout URL.
+// Upgrade CTA links to /upgrade (which reads NEXT_PUBLIC_STRIPE_CHECKOUT_URL).
+// When Stripe is ready: set NEXT_PUBLIC_STRIPE_CHECKOUT_URL in Vercel env vars — no changes needed here.
 
+import { useRouter } from 'next/navigation'
 import Modal from '@/components/Modal'
 import Button from '@/components/Button'
 
@@ -43,6 +42,7 @@ const COPY = {
 }
 
 export default function PaywallModal({ isOpen, onClose, action }: PaywallModalProps) {
+  const router = useRouter()
   const copy = COPY[action]
 
   return (
@@ -76,12 +76,9 @@ export default function PaywallModal({ isOpen, onClose, action }: PaywallModalPr
             variant="primary"
             size="md"
             className="w-full justify-center"
-            onClick={() => {
-              // TODO Epic 16: window.location.href = process.env.NEXT_PUBLIC_STRIPE_CHECKOUT_URL
-              alert('Stripe coming soon — thank you for your interest!')
-            }}
+            onClick={() => { onClose(); router.push('/upgrade') }}
           >
-            Upgrade — $9/month
+            Upgrade — $9/month →
           </Button>
           <Button
             variant="ghost"

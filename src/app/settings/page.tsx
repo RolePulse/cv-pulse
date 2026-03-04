@@ -182,7 +182,17 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-[#222222] mb-0.5">Plan</p>
-                  <p className="text-sm text-[#444444]">{getPaidStatusLabel(paidStatus)}</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm text-[#444444]">{getPaidStatusLabel(paidStatus)}</p>
+                    {paidStatus === 'free' && (
+                      <Link
+                        href="/upgrade"
+                        className="text-xs font-semibold text-[#FF6B00] hover:text-[#E85F00] border border-[#FF6B00] hover:border-[#E85F00] rounded-full px-2.5 py-0.5 transition-colors"
+                      >
+                        Upgrade →
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
             </>

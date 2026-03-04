@@ -327,11 +327,11 @@ function RoleCard({
       </div>
       <div className="space-y-1.5">
         {role.bullets.map((bullet, bi) => (
-          <div key={bi} className="flex items-start gap-1.5 group">
+          <div key={bi} className="flex items-start gap-1.5">
             <span className="text-[#FF6B00] mt-1.5 flex-shrink-0 text-sm">•</span>
             <EditableText value={bullet} onChange={(v) => updateBullet(bi, v)} placeholder="Add a bullet point…" className="flex-1" />
             {role.bullets.length > 1 && (
-              <button onClick={() => removeBullet(bi)} className="opacity-0 group-hover:opacity-100 text-[#BBBBBB] hover:text-[#DC2626] transition-all text-sm flex-shrink-0 mt-1 cursor-pointer" title="Remove">×</button>
+              <button onClick={() => removeBullet(bi)} className="text-[#CCCCCC] hover:text-[#DC2626] active:text-[#DC2626] transition-colors text-base flex-shrink-0 mt-0.5 cursor-pointer p-1 -mr-1" title="Remove bullet">×</button>
             )}
           </div>
         ))}

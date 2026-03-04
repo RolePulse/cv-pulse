@@ -140,9 +140,10 @@ const DATE_SEP = `(?:\\s*[-–—]\\s*|\\s+to\\s+|\\s+through\\s+|\\s+until\\s+)
 // DATE_PART matches any single date value — covers:
 //   "Jan 2020"   — month name + 4-digit year
 //   "2020"       — bare 4-digit year
+//   "2024.09"    — YYYY.MM (dot-separated, common in Asian/European CVs e.g. Aram's format)
 //   "8/21"       — M/YY (US short: "8/21", "06/23")
 //   "06/2021"    — M/YYYY (US long: "06/2021", "5/2024")
-const DATE_PART = `(?:(?:${MONTHS_PATTERN})\\.?\\s+)?(?:(?:20|19)\\d{2}|\\d{1,2}\\/(?:(?:20|19)\\d{2}|\\d{2}))`
+const DATE_PART = `(?:(?:${MONTHS_PATTERN})\\.?\\s+)?(?:(?:20|19)\\d{2}(?:\\.\\d{2})?|\\d{1,2}\\/(?:(?:20|19)\\d{2}|\\d{2}))`
 
 export const DATE_RANGE_RE = new RegExp(
   `${DATE_PART}${DATE_SEP}(?:${DATE_PART}|present|current|now)`,
@@ -171,6 +172,13 @@ function looksLikeLocation(line: string): boolean {
   // "City, Region" where region is a word or 2-letter state code — no digits, no bullet chars
   // \s*$ allows for any stray trailing whitespace not caught by trim() (Unicode spaces, etc.)
   return /^[A-Za-z][A-Za-z\s\-]+,\s*[A-Za-z]{2,}\s*$/.test(trimmed) && !/\d/.test(trimmed)
+}
+
+// Returns true for street address lines — e.g. "585 N Rossmore Avenue Apt 402, Los Angeles, CA"
+// These appear as page-header artifacts in multi-page CVs and should never be used as titles/companies
+function looksLikeAddress(line: string): boolean {
+  // Street addresses start with a house/building number followed by a capitalised street name
+  return /^\d+\s+[A-Z]/.test(line.trim())
 }
 
 // Returns true for lines that are just a lone column-separator artifact (e.g. "|" or "·")
@@ -365,15 +373,17 @@ export function extractExperience(text: string): ExperienceRole[] {
     const prev2 = dateIdx > 1 ? lines[dateIdx - 2] : ''
     const prev3 = dateIdx > 2 ? lines[dateIdx - 3] : ''
 
-    // Skip prev1 if it is a bare location, separator, or bullet from the previous role's content
-    const skip1 = looksLikeLocation(prev1) || looksLikeSeparator(prev1) || isBulletLine(prev1)
+    // Skip prev1 if it is blank, a bare location, separator, or bullet from the previous role's content
+    // Blank lines between headers and dates are common in templates like Alan Lee / MATRIXX
+    const skip1 = !prev1.trim() || looksLikeLocation(prev1) || looksLikeSeparator(prev1) || isBulletLine(prev1)
     const effective1 = skip1 ? prev2 : prev1
 
     // skip2: also skip location lines one level further back
     // 4-line header pattern: Company → Location → Title → Date (e.g. MongoDB)
     // When rawEffective2 is a location, effective2 steps over it to find the real company
     const rawEffective2 = skip1 ? prev3 : prev2
-    const skip2 = looksLikeLocation(rawEffective2)
+    // Also skip street address lines — page-header artifacts in multi-page CVs
+    const skip2 = looksLikeLocation(rawEffective2) || looksLikeAddress(rawEffective2)
     const effective2 = skip2
       ? (skip1 ? (dateIdx >= 4 ? lines[dateIdx - 4] : '') : prev3)
       : rawEffective2

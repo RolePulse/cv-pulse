@@ -175,7 +175,7 @@ function ExportContent() {
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
         <div className="mb-10">
-          <ProgressIndicator currentStep="export" />
+          <ProgressIndicator currentStep="export" cvId={resolvedCvId ?? undefined} />
         </div>
 
         <h1 className="text-2xl font-bold text-[#222222] mb-2 text-center">Export your CV</h1>

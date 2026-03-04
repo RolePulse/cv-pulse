@@ -155,3 +155,43 @@ Biggest structural UX improvement: merged the separate `/results` and `/editor` 
 
 ### Next
 James to re-upload AvePoint, GovInvest, MongoDB CVs to verify live parsing.
+
+---
+
+## 2026-03-03 — Parser Fixes: Title-Inline Format + Bullet Continuation (commit 99c2bf5)
+
+**Date:** Tuesday 3 March 2026, ~19:50 GMT
+**Verified against:** AJ Gilosa Resume.pdf (real CV — not synthetic fixtures)
+
+### What was wrong
+
+All 5 non-MongoDB roles (AvePoint, GovInvest, Ya y P a y, Brocair Partners, Ridgetop Research) had:
+- Title and company **completely swapped** — "Enterprise Account Executive" was set as company, the actual company name as title
+- Bullet **continuations dropped** — wrapped lines ("the USA", "High Ranking IT Leaders...", "develop Go-to-market strategy") were silently discarded
+- MongoDB ticker "(Ticker: MDB)" not stripped from company name
+
+### Root causes + fixes
+
+**1. Title-inline format (no pipe separator)**
+- Format: "Enterprise Account Executive Dec 2020 - Aug 2024" with company on line above
+- Parser assumed inline text = company. Added `TITLE_KEYWORD_RE` to detect job titles inline.
+- New `else if (title && !company)` branch finds company from prev lines, handles both standalone company lines and "Company City, State" combined lines
+
+**2. Bullet continuation merging**
+- Long bullets wrap across 2 lines in PDF: "...involving multiple\nHigh Ranking IT Leaders..."
+- Old code: filter-only pass, dropped all non-bullet lines
+- New code: loop that appends continuation lines when: starts lowercase/special char OR prev ends mid-word; blocked when line has mid-string "(" (company ticker indicator)
+
+**3. cleanCompanyLine regex fix**
+- Regex `(?:\s+[A-Z][a-zA-Z]+)*` was unlimited — stripped "Partners" from "Brocair Partners"
+- Changed to `?` (max one optional extra city word): "Brocair Partners New York, NY" → "Brocair Partners"
+
+**4. cleanCompanyLine in 4-line header path**
+- MongoDB role: company was set to "MongoDB (Ticker: MDB)" without cleaning
+- Now applies cleanCompanyLine to effective2 in the skip2 branch
+
+### Tool built
+`scripts/inspect-parse.ts` — runs a real PDF through the parser and shows raw text, parsed roles, and a bullet coverage check. Use this for all future parser verification.
+
+### Tests
+806 tests, all passing. Zero TypeScript errors.

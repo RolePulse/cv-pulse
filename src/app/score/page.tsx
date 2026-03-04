@@ -677,7 +677,7 @@ function EditorPanel({
       {/* Progress + save */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1">
-          <ProgressIndicator currentStep="score" />
+          <ProgressIndicator currentStep="score" cvId={cvId ?? undefined} />
         </div>
         <SaveBadge status={saveStatus} />
       </div>

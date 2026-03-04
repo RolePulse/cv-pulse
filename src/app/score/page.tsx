@@ -254,9 +254,9 @@ function EditableText({
       rows={rows}
       onChange={(e) => { onChange(e.target.value); autoResize(e.target) }}
       className={[
-        'w-full text-sm text-[#222222] border border-transparent rounded-[4px] px-2 py-1',
+        'w-full text-sm text-[#222222] border border-[#EEEEEE] rounded-[4px] px-2 py-1',
         'hover:border-[#DDDDDD] focus:border-[#FF6B00] focus:outline-none',
-        'resize-none transition-colors bg-transparent focus:bg-white',
+        'resize-none transition-colors bg-[#F9F9F9] focus:bg-white',
         className,
       ].join(' ')}
     />
@@ -283,9 +283,9 @@ function EditableInput({
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
       className={[
-        'text-sm border border-transparent rounded-[4px] px-2 py-0.5',
+        'text-sm border border-[#EEEEEE] rounded-[4px] px-2 py-0.5',
         'hover:border-[#DDDDDD] focus:border-[#FF6B00] focus:outline-none',
-        'transition-colors bg-transparent focus:bg-white w-full',
+        'transition-colors bg-[#F9F9F9] focus:bg-white w-full',
         className,
       ].join(' ')}
     />
@@ -701,6 +701,12 @@ function EditorPanel({
           <ProgressIndicator currentStep="score" cvId={cvId ?? undefined} />
         </div>
         <SaveBadge status={saveStatus} />
+      </div>
+
+      {/* Edit hint */}
+      <div className="flex items-center gap-2 text-[#888888] text-[12px] bg-[#F9F9F9] rounded-[6px] px-3 py-2 border border-[#EEEEEE]">
+        <span className="text-[14px]">✏️</span>
+        <span>All fields are editable — tap any field to make changes</span>
       </div>
 
       {/* Placeholder reminder */}

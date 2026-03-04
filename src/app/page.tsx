@@ -53,7 +53,7 @@ export default async function Home() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-20 pb-16 text-center">
         <div className="inline-flex items-center gap-2 bg-white border border-[#DDDDDD] rounded-full px-4 py-1.5 mb-8 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-[#FF6B00] animate-pulse" />
-          <span className="text-sm text-[#444444] font-medium">Built for GTM professionals</span>
+          <span className="text-sm text-[#444444] font-medium">From the team behind <a href="https://rolepulse.com" className="font-semibold text-[#FF6B00] hover:underline">RolePulse</a></span>
         </div>
 
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-[#222222] leading-tight tracking-tight max-w-3xl mx-auto">
@@ -64,6 +64,18 @@ export default async function Home() {
         <p className="mt-6 text-lg text-[#444444] max-w-xl mx-auto leading-relaxed">
           Upload your CV, score it against your target role, fix the gaps, and download a polished PDF. Know exactly what a recruiter sees.
         </p>
+
+        {/* Role pills */}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          {['SDR / BDR', 'Account Executive', 'CSM', 'GTM Marketing', 'RevOps'].map((role) => (
+            <span
+              key={role}
+              className="text-xs font-medium text-[#555555] bg-white border border-[#DDDDDD] rounded-full px-3 py-1"
+            >
+              {role}
+            </span>
+          ))}
+        </div>
 
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link href="/upload">
@@ -79,6 +91,58 @@ export default async function Home() {
           </Link>
         </div>
         <p className="mt-3 text-xs text-[#BBBBBB]">Free to start · No card required</p>
+      </section>
+
+      {/* Trust strip */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-14">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            {
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="9" cy="7" r="4" stroke="#FF6B00" strokeWidth="2" />
+                  <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ),
+              stat: '1,600+ subscribers',
+              label: 'Trust the RolePulse brand',
+            },
+            {
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="#FF6B00" strokeWidth="2" />
+                  <circle cx="12" cy="12" r="3" stroke="#FF6B00" strokeWidth="2" />
+                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              ),
+              stat: 'GTM-specific',
+              label: 'Scored for your exact role — not generic CV advice',
+            },
+            {
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M9 12l2 2 4-4" stroke="#FF6B00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ),
+              stat: 'Deterministic scoring',
+              label: 'Same CV, same score, every time. No AI guesswork',
+            },
+          ].map((item) => (
+            <div
+              key={item.stat}
+              className="bg-white rounded-[8px] border border-[#DDDDDD] px-5 py-4 flex items-start gap-3"
+              style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+            >
+              <div className="mt-0.5 flex-shrink-0">{item.icon}</div>
+              <div>
+                <p className="text-[14px] font-semibold text-[#222222]">{item.stat}</p>
+                <p className="text-xs text-[#666666] mt-0.5 leading-relaxed">{item.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Feature cards */}

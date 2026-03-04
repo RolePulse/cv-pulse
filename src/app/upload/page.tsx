@@ -41,12 +41,22 @@ export default function UploadPage() {
   const [termsError, setTermsError] = useState(false)
   const [selectedRole, setSelectedRole] = useState<TargetRole | null>(null)
   const [paywallOpen, setPaywallOpen] = useState(false)
+  const [existingCvId, setExistingCvId] = useState<string | null>(null)
 
-  // Check auth state on mount
+  // Check auth state on mount — also fetch existing CV so we can route "Maybe later" correctly
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       setIsSignedIn(!!user)
+      if (user) {
+        const { data: cvs } = await supabase
+          .from('cvs')
+          .select('id')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+        if (cvs && cvs.length > 0) setExistingCvId(cvs[0].id)
+      }
     })
   }, [])
 
@@ -412,6 +422,24 @@ export default function UploadPage() {
           </div>
         )}
 
+        {/* Existing CV banner — shown when user already has one */}
+        {!isProcessing && existingCvId && (
+          <div className="mt-6 rounded-[8px] border border-[#DDDDDD] bg-white p-4 flex items-start sm:items-center justify-between gap-4 flex-col sm:flex-row">
+            <div>
+              <p className="text-sm font-semibold text-[#222222]">You already have a scored CV</p>
+              <p className="text-xs text-[#666666] mt-0.5">Continue working on it, or upgrade to score a second version.</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push(`/score?cvId=${existingCvId}`)}
+              className="whitespace-nowrap text-[#FF6B00] border border-[#FF6B00] hover:bg-[#FFF0E8] flex-shrink-0"
+            >
+              View my CV →
+            </Button>
+          </div>
+        )}
+
         {/* Role selection */}
         {!isProcessing && (
           <div className="mt-8">
@@ -515,7 +543,16 @@ export default function UploadPage() {
         </div>
       </footer>
 
-      <PaywallModal isOpen={paywallOpen} onClose={() => setPaywallOpen(false)} action="second_upload" />
+      <PaywallModal
+        isOpen={paywallOpen}
+        onClose={() => {
+          setPaywallOpen(false)
+          // Route back to existing CV — "Maybe later" should never dead-end on the upload page
+          if (existingCvId) router.push(`/score?cvId=${existingCvId}`)
+        }}
+        action="second_upload"
+        closeLabel={existingCvId ? 'Back to my CV →' : 'Maybe later'}
+      />
     </div>
   )
 }

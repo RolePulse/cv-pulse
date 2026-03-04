@@ -12,6 +12,7 @@ interface PaywallModalProps {
   isOpen: boolean
   onClose: () => void
   action: 'jd_check' | 'second_upload'
+  closeLabel?: string
 }
 
 const COPY = {
@@ -41,7 +42,7 @@ const COPY = {
   },
 }
 
-export default function PaywallModal({ isOpen, onClose, action }: PaywallModalProps) {
+export default function PaywallModal({ isOpen, onClose, action, closeLabel = 'Maybe later' }: PaywallModalProps) {
   const router = useRouter()
   const copy = COPY[action]
 
@@ -86,7 +87,7 @@ export default function PaywallModal({ isOpen, onClose, action }: PaywallModalPr
             className="w-full justify-center text-[#666666]"
             onClick={onClose}
           >
-            Maybe later
+            {closeLabel}
           </Button>
         </div>
 

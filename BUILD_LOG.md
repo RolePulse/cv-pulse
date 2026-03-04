@@ -195,3 +195,132 @@ All 5 non-MongoDB roles (AvePoint, GovInvest, Ya y P a y, Brocair Partners, Ridg
 
 ### Tests
 806 tests, all passing. Zero TypeScript errors.
+
+---
+
+## 2026-03-04 18:28 GMT — Fix #6: Add summary when missing (commit ef0e24d)
+
+### What was built
+- Summary section in EditorPanel always renders, even when `cv.summary` is empty or undefined
+- Amber nudge card shown when summary is missing: "No summary detected — add one below to unlock up to +5 pts"
+- Scorer guarded against undefined summary (two `?? ''` guards added)
+
+### Files changed
+- `src/app/score/page.tsx` — removed `cv.summary !== undefined` guard; nudge card added with condition `!cv.summary?.trim()`; textarea value uses `cv.summary ?? ''`
+- `src/lib/scorer.ts` — `structured.summary.toLowerCase()` → `(structured.summary ?? '').toLowerCase()`; `structured.summary.trim().length` → `(structured.summary ?? '').trim().length`
+
+### Decisions
+- Amber/yellow nudge colour chosen (matching placeholder reminder style) — subtle but clear
+- Summary card always present so users know the field exists even if parser missed it
+- Nudge dismisses naturally when user types and re-scores (no manual dismiss needed)
+
+### Test results
+- 807/807 tests passing
+- Browser tested ✅: loaded test CV with summary blanked in DB, confirmed amber nudge visible + section renders; score correctly dropped from 55→50 with missing summary, confirming scorer guard works
+- Restored test CV summary after verification
+
+### Next step
+Fix #8 — back navigation on export / JD match / settings pages
+
+---
+
+## 2026-03-04 18:34 GMT — Fix #8: Back navigation on export/JD match/settings (commit b0fe7c0)
+
+### What was built
+- JD Match page: "← Back to score" link at top. Links to `/score?cvId=X` when cvId is available; falls back to `/upload`
+- Settings page: "← Back" button using `router.back()`
+- Export page: already has ProgressIndicator with completed steps as clickable links (confirmed working)
+
+### Files changed
+- `src/app/jd-match/page.tsx` — added `Link` import; added back link above h1
+- `src/app/settings/page.tsx` — added back button above h1 using router.back()
+
+### Decisions
+- JD Match uses a direct link (not router.back()) so the URL is predictable and correct even if user navigated there from a different entry point
+- Settings uses router.back() since there's no cvId context — appropriate for a utility page
+
+### Test results
+- 807/807 tests passing
+- Browser tested ✅: JD Match and Settings back links verified visually; Export ProgressIndicator confirmed working
+
+### Next step
+Fix #9 — landing page social proof
+
+---
+
+## 2026-03-04 18:37 GMT — Fix #9: Landing page social proof (commit 74d42e5)
+
+### What was built
+- Hero pill: "From the team behind RolePulse" (was "Built for GTM professionals")
+- Role pills row: SDR/BDR · Account Executive · CSM · GTM Marketing · RevOps — below the subheadline
+- Trust strip (3 cards): 1,600+ subscribers / GTM-specific / Deterministic scoring
+
+### Files changed
+- `src/app/page.tsx` — hero pill updated, role pills added, trust strip section added
+
+### Decisions
+- Used real number (1,600+ subscribers) not inflated — honest social proof
+- "Deterministic scoring — same CV, same score, every time. No AI guesswork" is the key differentiator vs ChatGPT
+- Trust strip placed between hero and feature cards so it's visible before the user scrolls
+- RolePulse link is orange (brand accent) in the pill to reinforce the connection
+
+### Test results
+- 807/807 tests passing
+- Browser tested ✅: full page screenshot confirmed all 3 sections render correctly
+
+### Next step
+Fix #10 — upgrade path
+
+---
+
+## 2026-03-04 18:43 GMT — Fix #10: Upgrade path (commit 66fb7f8)
+
+### What was built
+- `/upgrade` page: Free vs Pro pricing cards, RolePulse member note, "Get early access" CTA (with Stripe URL env var hook), back link, questions email
+- `PaywallModal.tsx`: removed `alert('Stripe coming soon')` — now routes to `/upgrade` via `router.push`
+- `settings/page.tsx`: "Upgrade →" orange pill link next to "Plan: Free" for free users
+
+### Files changed
+- `src/app/upgrade/page.tsx` — new file
+- `src/components/PaywallModal.tsx` — replace alert with router.push('/upgrade')
+- `src/app/settings/page.tsx` — upgrade pill for free users
+
+### Decisions
+- CTA button text is "Get early access →" when NEXT_PUBLIC_STRIPE_CHECKOUT_URL is not set; switches to "Upgrade now →" when it is — no code change needed when James sets up Stripe
+- Fallback CTA opens mailto:hello@cvpulse.io with pre-filled subject
+- "Pro launching soon — we'll be in touch" shown below CTA when no Stripe URL set — honest messaging
+- RolePulse paid member path explained on the page
+
+### How to activate Stripe
+1. Create a Stripe Payment Link in dashboard
+2. Add `NEXT_PUBLIC_STRIPE_CHECKOUT_URL=https://buy.stripe.com/...` to Vercel env vars
+3. Redeploy — button text and link update automatically
+
+### Test results
+- 807/807 tests passing
+- Browser tested ✅: /upgrade full page verified, Settings upgrade pill verified
+
+### ALL PRE-LAUNCH UX ITEMS COMPLETE ✅ (fixes #1–#10)
+
+---
+
+## 2026-03-04 18:53 GMT — Fix #11: Parser — multiple roles under one company header (commit 770cba6)
+
+### Root cause
+"Title | Date" branch only checked `prev1`/`prev2` (2 lines back) for the company name. CVs with multiple roles under one company header had the company 5-6 lines back, separated by bullets and a date-range line. Result: continuation roles had `company = ""`.
+
+### Fix
+Extended lookback from 2 to 12 lines in the `endsWithPipe && title` branch. Skips: blank lines, bullets, location lines, date-range lines (continue, don't stop). Stops at all-caps section headers (EXPERIENCE, EDUCATION etc).
+
+### Files changed
+- `src/lib/parser.ts` — extended lookback loop (was `[prev1, prev2].find()`, now loop to 12)
+- `src/lib/__tests__/parser-fixes-march2026.test.ts` — 2 new regression tests
+
+### DB fix
+Re-parsed 5 affected CVs via `parseText(raw_text)` and updated `structured_json`:
+- e7624aba, 2a6e0553, fd8e8906, 480e48c4, 7bc9405f
+
+### Test results
+- 809/809 tests passing (+2 new tests)
+
+### ALL 11 PRE-LAUNCH ITEMS COMPLETE ✅

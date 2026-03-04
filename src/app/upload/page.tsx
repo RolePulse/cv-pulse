@@ -8,6 +8,7 @@ import ProgressIndicator from '@/components/ProgressIndicator'
 import Button from '@/components/Button'
 import AlertBanner from '@/components/AlertBanner'
 import { createClient } from '@/lib/supabase/client'
+import { ALL_ROLES, ROLE_LABELS, ROLE_DESCRIPTIONS, type TargetRole } from '@/lib/roleDetect'
 
 type UploadStep = 'idle' | 'parsing' | 'structuring' | 'validating' | 'ready' | 'failed' | 'gate_failed'
 
@@ -37,6 +38,7 @@ export default function UploadPage() {
   const [gateReason, setGateReason] = useState<string | null>(null)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [termsError, setTermsError] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<TargetRole | null>(null)
 
   // Check auth state on mount
   useEffect(() => {
@@ -69,6 +71,7 @@ export default function UploadPage() {
   }
 
   const hasContent = !!file || pasteText.trim().length > 100
+  const canSubmit = hasContent && !!selectedRole
   const isProcessing = ['parsing', 'structuring', 'validating', 'ready'].includes(step)
 
   const handleDrop = (e: React.DragEvent) => {
@@ -128,7 +131,7 @@ export default function UploadPage() {
   }
 
   async function handleSubmit() {
-    if (!hasContent || isProcessing) return
+    if (!canSubmit || isProcessing) return
 
     if (!termsAccepted) {
       setTermsError(true)
@@ -160,10 +163,10 @@ export default function UploadPage() {
       return
     }
 
-    handleResult(data)
+    await handleResult(data)
   }
 
-  function handleResult(data: { ok: boolean; cvId?: string; failReason?: string; error?: string }) {
+  async function handleResult(data: { ok: boolean; cvId?: string; failReason?: string; error?: string }) {
     if (!data.ok) {
       if (data.failReason) {
         // Confidence gate failure
@@ -176,8 +179,23 @@ export default function UploadPage() {
       return
     }
 
+    // Patch selected role before navigating
+    if (selectedRole && data.cvId) {
+      try {
+        await fetch(`/api/cv/${data.cvId}/role`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetRole: selectedRole }),
+        })
+      } catch {
+        // Non-fatal — score page will redirect to /select-role if role missing
+      }
+    }
+
     setStep('ready')
-    router.push(`/select-role?cvId=${data.cvId}`)
+    router.push(selectedRole && data.cvId
+      ? `/score?cvId=${data.cvId}`
+      : `/select-role?cvId=${data.cvId}`)
   }
 
   function switchToPaste() {
@@ -386,6 +404,45 @@ export default function UploadPage() {
           </div>
         )}
 
+        {/* Role selection */}
+        {!isProcessing && (
+          <div className="mt-8">
+            <h2 className="text-[15px] font-semibold text-[#222222] mb-0.5">What role are you targeting?</h2>
+            <p className="text-xs text-[#999999] mb-3">We&apos;ll score your CV against this specific role.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {ALL_ROLES.map((role) => {
+                const isSelected = selectedRole === role
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setSelectedRole(role)}
+                    className={[
+                      'rounded-[8px] border-2 p-3 text-left flex flex-col gap-1 transition-all cursor-pointer',
+                      isSelected
+                        ? 'border-[#FF6B00] bg-[#FFF0E8]'
+                        : 'border-[#E8E0D8] bg-white hover:border-[#FF6B00]/40 hover:bg-[#FFF7F2]',
+                    ].join(' ')}
+                    aria-pressed={isSelected}
+                  >
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="font-semibold text-[#222222] text-xs leading-tight">{ROLE_LABELS[role]}</span>
+                      {isSelected && (
+                        <span className="w-4 h-4 rounded-full bg-[#FF6B00] flex items-center justify-center flex-shrink-0">
+                          <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
+                            <path d="M1.5 5L4 7.5L8.5 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-[#999999] leading-snug">{ROLE_DESCRIPTIONS[role]}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Consent checkbox */}
         {!isProcessing && (
           <div className="mt-6">
@@ -421,12 +478,18 @@ export default function UploadPage() {
             <Button
               variant="primary"
               size="lg"
-              disabled={!hasContent}
+              disabled={!canSubmit}
               onClick={handleSubmit}
               className="w-full justify-center"
             >
               Analyse my CV →
             </Button>
+            {!hasContent && (
+              <p className="text-xs text-[#999999] text-center mt-2">Upload a CV or paste your text above</p>
+            )}
+            {hasContent && !selectedRole && (
+              <p className="text-xs text-[#999999] text-center mt-2">Select a target role above to continue</p>
+            )}
           </div>
         )}
 

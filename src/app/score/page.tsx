@@ -721,13 +721,24 @@ function EditorPanel({
       {/* Placeholder reminder */}
       {placeholders > 0 && <PlaceholderReminder count={placeholders} />}
 
-      {/* Summary */}
-      {cv.summary !== undefined && (
-        <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-5" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide mb-3">Summary</h2>
-          <EditableText value={cv.summary} onChange={onSummaryChange} placeholder="Write a 2–3 sentence professional summary targeting your chosen role…" rows={3} />
-        </div>
-      )}
+      {/* Summary — always shown; nudge when missing */}
+      <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-5" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide mb-3">Summary</h2>
+        {!cv.summary?.trim() && (
+          <div className="mb-3 flex items-start gap-2 bg-[#FFFBEB] border border-[#FDE68A] rounded-[6px] px-3 py-2.5">
+            <span className="text-[13px] flex-shrink-0">✍️</span>
+            <p className="text-[11px] text-[#92400E] leading-relaxed">
+              No summary detected — add one below to unlock up to <span className="font-semibold">+5 pts</span>
+            </p>
+          </div>
+        )}
+        <EditableText
+          value={cv.summary ?? ''}
+          onChange={onSummaryChange}
+          placeholder="Write a 2–3 sentence professional summary targeting your chosen role…"
+          rows={3}
+        />
+      </div>
 
       {/* Experience */}
       <div>

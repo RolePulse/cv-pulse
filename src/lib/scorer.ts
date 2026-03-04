@@ -758,7 +758,7 @@ function scoreClarity(
 
   // Target role signal in title or summary: 0–5pts
   const signals = ROLE_SIGNALS[targetRole]
-  const lowerSummary = structured.summary.toLowerCase()
+  const lowerSummary = (structured.summary ?? '').toLowerCase()
   const mostRecentTitle = structured.experience[0]?.title?.toLowerCase() ?? ''
   const inSummary = signals.some((s) => lowerSummary.includes(s.toLowerCase()))
   const inTitle = signals.some((s) => mostRecentTitle.includes(s.toLowerCase()))
@@ -843,7 +843,7 @@ function scoreClarity(
   }
 
   // Summary present and substantial: 0–5pts
-  const summaryLen = structured.summary.trim().length
+  const summaryLen = (structured.summary ?? '').trim().length
   let summaryPts = 0
   if (summaryLen >= 150) {
     summaryPts = 5

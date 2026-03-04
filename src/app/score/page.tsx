@@ -679,6 +679,8 @@ function EditorPanel({
   onSkillsChange,
   onEducationChange,
   onCertsChange,
+  onAddRole,
+  onAddEducation,
   cvId,
 }: {
   cv: StructuredCV
@@ -688,6 +690,8 @@ function EditorPanel({
   onSkillsChange: (skills: string[]) => void
   onEducationChange: (i: number, e: EducationEntry) => void
   onCertsChange: (raw: string) => void
+  onAddRole: () => void
+  onAddEducation: () => void
   cvId: string
 }) {
   const router = useRouter()
@@ -721,16 +725,21 @@ function EditorPanel({
       )}
 
       {/* Experience */}
-      {cv.experience?.length > 0 && (
-        <div>
-          <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide px-1 mb-3">Experience</h2>
+      <div>
+        <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide px-1 mb-3">Experience</h2>
+        {cv.experience?.length > 0 ? (
           <div className="space-y-4">
             {cv.experience.map((role, i) => (
               <RoleCard key={i} role={role} index={i} onChange={(updated) => onRoleChange(i, updated)} />
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-sm text-[#BBBBBB] px-1 mb-2">No experience added yet.</p>
+        )}
+        <button onClick={onAddRole} className="mt-3 text-xs text-[#FF6B00] hover:text-[#E85F00] transition-colors cursor-pointer flex items-center gap-1 px-1">
+          + Add role
+        </button>
+      </div>
 
       {/* Skills */}
       {cv.skills !== undefined && (
@@ -742,10 +751,10 @@ function EditorPanel({
       )}
 
       {/* Education */}
-      {cv.education?.length > 0 && (
-        <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-5" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide mb-3">Education</h2>
-          <div className="space-y-3">
+      <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-5" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide mb-3">Education</h2>
+        {cv.education?.length > 0 ? (
+          <div className="space-y-3 mb-3">
             {cv.education.map((edu, i) => (
               <div key={i} className="flex flex-wrap gap-1 items-center">
                 <EditableInput value={edu.qualification} onChange={(v) => onEducationChange(i, { ...edu, qualification: v })} placeholder="Qualification" className="font-medium text-[#222222]" />
@@ -756,8 +765,13 @@ function EditorPanel({
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-sm text-[#BBBBBB] mb-3">No education added yet.</p>
+        )}
+        <button onClick={onAddEducation} className="text-xs text-[#FF6B00] hover:text-[#E85F00] transition-colors cursor-pointer flex items-center gap-1">
+          + Add education
+        </button>
+      </div>
 
       {/* Certifications */}
       {cv.certifications?.length > 0 && (
@@ -981,6 +995,14 @@ function ScorePageContent() {
     const education = [...(cv?.education ?? [])]; education[index] = edu
     const u = { ...cv!, education }; setCV(u); scheduleSave(u)
   }
+  const addRole = () => {
+    const experience = [...(cv?.experience ?? []), { company: '', title: '', start: '', end: null, bullets: [''] }]
+    const u = { ...cv!, experience }; setCV(u); scheduleSave(u)
+  }
+  const addEducation = () => {
+    const education = [...(cv?.education ?? []), { institution: '', qualification: '', year: '' }]
+    const u = { ...cv!, education }; setCV(u); scheduleSave(u)
+  }
   const updateCerts = (raw: string) => {
     const certifications = raw.split('\n').map((s) => s.trim()).filter(Boolean)
     const u = { ...cv!, certifications }; setCV(u); scheduleSave(u)
@@ -1041,6 +1063,8 @@ function ScorePageContent() {
     onSkillsChange: updateSkills,
     onEducationChange: updateEducation,
     onCertsChange: updateCerts,
+    onAddRole: addRole,
+    onAddEducation: addEducation,
     cvId: cvId!,
   } as const
 

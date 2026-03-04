@@ -171,7 +171,13 @@ function looksLikeLocation(line: string): boolean {
   if (trimmed.length > 50) return false
   // "City, Region" where region is a word or 2-letter state code — no digits, no bullet chars
   // \s*$ allows for any stray trailing whitespace not caught by trim() (Unicode spaces, etc.)
-  return /^[A-Za-z][A-Za-z\s\-]+,\s*[A-Za-z]{2,}\s*$/.test(trimmed) && !/\d/.test(trimmed)
+  if (!/^[A-Za-z][A-Za-z\s\-]+,\s*[A-Za-z]{2,}\s*$/.test(trimmed)) return false
+  if (/\d/.test(trimmed)) return false
+  // Guard: do NOT classify as location if the line contains a job-title keyword.
+  // "Sales Manager, Large Enterprise" / "Account Executive, North America" look like
+  // "City, Region" to the regex but are job titles with territory suffixes — not locations.
+  if (TITLE_KEYWORD_RE.test(trimmed)) return false
+  return true
 }
 
 // Returns true for street address lines — e.g. "585 N Rossmore Avenue Apt 402, Los Angeles, CA"
@@ -217,24 +223,26 @@ export function extractBullets(text: string): string[] {
 // Strategy: primary = anchor on date ranges; fallback = anchor on year tokens.
 
 // Job title keyword detector — used to distinguish inline-title from inline-company.
-// When the text inline before a date contains one of these words, it's almost certainly a title,
-// not a company name. Enables correct parsing of "Title Date" format (no pipe separator):
-//   AvePoint (Ticker: AV P T ) Jersey City, NJ
-//   Enterprise Account Executive Dec 2020 - Aug 2024   ← title inline, company above
-const TITLE_KEYWORD_RE = /\b(?:executive|manager|director|analyst|associate|coordinator|specialist|engineer|developer|consultant|advisor|representative|officer|president|vice\s+president|lead|head\s+of|SDR|BDR|AE|CSM|CSE|SE|VP|CTO|CFO|CMO|COO|CEO|intern|fellow|generalist)\b/i
+// When the text inline before/after a date contains one of these words, it's almost certainly a title,
+// not a company name. Enables correct parsing of "Title Date" and "Date Title" formats.
+// Keep this list broad — false positives (company names with these words) are rare, and the cost of
+// missing a title keyword (leaving it in the company field) is worse than an occasional over-match.
+const TITLE_KEYWORD_RE = /\b(?:executive|manager|director|analyst|associate|coordinator|specialist|engineer|developer|consultant|advisor|representative|officer|president|vice\s+president|lead|head\s+of|SDR|BDR|AE|CSM|CSE|SE|VP|CTO|CFO|CMO|COO|CEO|intern|fellow|generalist|designer|architect|strategist|recruiter|writer|editor|producer|researcher|scientist|technician|operator|planner|buyer|controller|trainer|programmer|administrator|assistant|account\s+executive|account\s+manager|sales\s+development|business\s+development|customer\s+success|customer\s+support|product\s+manager|project\s+manager|program\s+manager|marketing\s+manager|operations\s+manager|growth\s+manager|revenue\s+operations|demand\s+gen|content\s+(?:manager|strategist|creator)|graphic\s+designer|web\s+designer|brand\s+designer|ux\s+designer|ui\s+designer|motion\s+designer|creative\s+director|art\s+director|copywriter|data\s+(?:analyst|engineer|scientist))\b/i
 
 // Strip ticker annotations and trailing location noise from company name lines.
 // e.g. "AvePoint (Ticker: AV P T ) Jersey City, NJ" → "AvePoint"
 //      "HiBob (acquired Mosaic) New York, NY"        → "HiBob (acquired Mosaic)"
-function cleanCompanyLine(raw: string): string {
+export function cleanCompanyLine(raw: string): string {
   return raw
     // Strip ticker/exchange annotations: "(Ticker: AVPT)", "(NYSE: X)", "(NASDAQ: AVPT)"
     .replace(/\s*\((?:Ticker|NYSE|NASDAQ|LSE|ASX|Symbol)\s*:?[^)]*\)/gi, '')
     // Strip trailing location noise: " New York, NY" / ", Jersey City, NJ"
+    // Also handles "- New York, NY" (dash-separated company+location on same line)
     // Max TWO city words prevents over-stripping: "Brocair Partners New York, NY"
-    // strips only " New York, NY", not " Partners New York, NY"
-    .replace(/(?:,|\s)\s*[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?,\s*[A-Z]{2}\s*$/, '')
+    .replace(/(?:[,\s]|-\s*)\s*[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?,\s*[A-Z]{2}\s*$/, '')
     .replace(/\s+/g, ' ')
+    // Strip any trailing punctuation left behind (dashes, commas, colons)
+    .replace(/[\s,\-–—:]+$/, '')
     .trim()
 }
 
@@ -328,6 +336,10 @@ export function extractExperience(text: string): ExperienceRole[] {
 
     // Case A: text inline before the date on the same line
     // Guard: must be > 5 chars and not a partial date fragment (e.g. "11/", "Jan", "06/")
+    // eslint-disable-next-line no-console
+    console.log(`[dateL] line="${dateLine.slice(0,70)}" tb="${textBefore.slice(0,30)}" p1="${(lines[dateIdx-1]??'').slice(0,30)}"`)
+    // eslint-disable-next-line no-console
+    if (TITLE_KEYWORD_RE.test(textBefore)) console.log(`[caseA] matched title kw`)
     if (textBefore.length > 5 && !/^\d{1,4}[\/\-]?$/.test(textBefore)) {
       // Detect "Title | Date" vs "Company | Date" format:
       // If prev1 already has a usable non-date/non-bullet/non-location line (a title above the date),
@@ -349,24 +361,37 @@ export function extractExperience(text: string): ExperienceRole[] {
         !/\s[-–]\s*(Remote|Hybrid|On-?site|Onsite|In-?person)\s*$/i.test(prevLine)
       )
       if (endsWithPipe && !prevHasTitle) {
-        // "Title | Date" format — no title above, so the inline text IS the job title
-        // Company will come from the line(s) above (handled below)
+        // "Title | Date" — nothing useful above: inline text IS the job title.
         title = textBefore
+      } else if (endsWithPipe && TITLE_KEYWORD_RE.test(textBefore)) {
+        // "Title | Date" — inline text has title keywords even though prevHasTitle is true.
+        // Many CVs: Company on line above, "Title | Date" below.
+        // e.g. "Societe Generale\nJunior Graphic Designer | Nov 2018 – Nov 2020"
+        //       ^^^ above (prevHasTitle=true)   ^^^ inline title with keyword
+        title = textBefore
+        // company comes from the lookback in the endsWithPipe block below
       } else if (!endsWithPipe && TITLE_KEYWORD_RE.test(textBefore)) {
         // "Title Date" inline format (no pipe) — the inline text is the title, company is above.
         // e.g. "Enterprise Account Executive Dec 2020 - Aug 2024" with company on line above.
-        // Company lookup happens in the dedicated branch below.
         title = textBefore
       } else {
         company = textBefore
       }
     }
 
-    // Case B: date at line start — "5/2024-4/2025 GIMMECREDIT, Tarrytown NY"
-    // When textBefore is empty, grab the text AFTER the date match as the company
+    // Case B: date at line start — "5/2024–4/2025 GIMMECREDIT, Tarrytown NY"
+    //                           or "1/25–Present Enterprise Account Executive"
+    // Grab the text AFTER the date match. Use TITLE_KEYWORD_RE to distinguish title vs company.
     if (!company && !title) {
       const textAfter = dateLine.slice(dateStart + rangeMatch[0].length).trim().replace(/^[|·—,\s]+/, '').trim()
-      if (textAfter.length > 3 && !/^\d/.test(textAfter)) company = textAfter
+      if (textAfter.length > 3 && !/^\d/.test(textAfter)) {
+        if (TITLE_KEYWORD_RE.test(textAfter)) {
+          // "Date Title" inline — title keyword detected in text after date
+          title = textAfter
+        } else {
+          company = textAfter
+        }
+      }
     }
 
     const prev1 = dateIdx > 0 ? lines[dateIdx - 1] : ''
@@ -424,6 +449,8 @@ export function extractExperience(text: string): ExperienceRole[] {
       const strictCompany = [prev1, prev2, prev3].find(
         l => l && !looksLikeDateRange(l) && !isBulletLine(l) && !looksLikeLocation(l) && !looksLikeSeparator(l)
       )
+      // eslint-disable-next-line no-console
+      console.log(`[title&&!co] title="${title}" p1="${prev1}" p2="${prev2}" p3="${prev3}" strictCo="${strictCompany}"`)
       if (strictCompany) {
         company = cleanCompanyLine(strictCompany)
       } else if (prev1 && looksLikeLocation(prev1) && prev1.trim().length > 15) {
@@ -443,6 +470,9 @@ export function extractExperience(text: string): ExperienceRole[] {
           const nextLine = lines[dateIdx + offset]?.trim() ?? ''
           if (!nextLine) continue
           if (isBulletLine(nextLine) || looksLikeDateRange(nextLine)) break
+          // Guard: skip lines that look like job titles — they belong to the NEXT role's header,
+          // not this role's company. e.g. Wolfson: date line, then next role title below.
+          if (TITLE_KEYWORD_RE.test(nextLine) && !/ - /.test(nextLine)) break
           // "Company, Location - Title" pattern
           if (/ - /.test(nextLine) && !nextLine.startsWith('-')) {
             const dashIdx = nextLine.lastIndexOf(' - ')
@@ -478,9 +508,28 @@ export function extractExperience(text: string): ExperienceRole[] {
             title = effective1
             company = cleanCompanyLine(effective2)
           } else {
-            // Standard two-line: effective2 = title, effective1 = company (standard UK format)
-            title = effective2
-            company = effective1
+            // Two-line header — could be UK format (Title above, Company below date)
+            // or US format (Company above, Title below date).
+            // Use TITLE_KEYWORD_RE to detect which line is the job title.
+            // e.g. "Salesforce\nEnterprise Account Executive\nDate" → e1 has keywords → e1=title, e2=company
+            //      "Account Executive\nSalesforce\nDate" → e2 has keywords → e2=title, e1=company
+            const e1HasTitle = TITLE_KEYWORD_RE.test(effective1)
+            const e2HasTitle = TITLE_KEYWORD_RE.test(effective2)
+            if (e1HasTitle && !e2HasTitle) {
+              // US format — Company (effective2) above, Title (effective1) below
+              title = effective1
+              company = cleanCompanyLine(effective2)
+            } else if (e2HasTitle && !e1HasTitle) {
+              // UK format — Title (effective2) above, Company (effective1) below
+              title = effective2
+              company = effective1
+            } else {
+              // Ambiguous (neither or both have title keywords).
+              // Fall back to UK format (original behaviour) to minimise test regressions
+              // while we gather more signal.
+              title = effective2
+              company = effective1
+            }
           }
         } else if (effective1 && !isBulletLine(effective1) && !looksLikeDateRange(effective1)) {
           title = effective1
@@ -490,6 +539,45 @@ export function extractExperience(text: string): ExperienceRole[] {
       // Company was set from inline text (non-pipe format) — get title from line above
       if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocation(prev1) && !looksLikeSeparator(prev1) && !isBulletLine(prev1)) {
         title = prev1
+      }
+    }
+
+    // ── Company recovery: short-range + extended lookback ────────────────
+    // Pass 1 (short): rawEffective2 was classified as a location but may be "Company- City, ST".
+    // e.g. "Slack - New York, NY" → cleanCompanyLine → "Slack". Only fires when skip2=true and
+    // rawEffective2 is non-empty (i.e., the immediate 2–3 line window had a location-like line).
+    if (!company && skip2 && rawEffective2.trim()) {
+      const recovered = cleanCompanyLine(rawEffective2)
+      // eslint-disable-next-line no-console
+      console.log(`[recovery] rawEff2="${rawEffective2}" → cleaned="${recovered}" looksLikeLoc=${looksLikeLocation(recovered)} titleKw=${TITLE_KEYWORD_RE.test(recovered)}`)
+      if (recovered && recovered.length > 1 && !looksLikeLocation(recovered) && !TITLE_KEYWORD_RE.test(recovered)) {
+        company = recovered
+      }
+    }
+
+    // Pass 2 (extended lookback): company is still empty — happens when:
+    //   (a) A blank line sits between the company header and the role title (company is 3+ lines up)
+    //   (b) Multiple roles share one company block: company header is many lines back, past
+    //       the previous role's bullets + date line (same-company continuation pattern).
+    // Walk back up to 15 lines from the date, skipping blank lines, bullets, date ranges,
+    // known title-keyword lines, and separator lines. Stop at section headers (ALL CAPS).
+    // Apply cleanCompanyLine to each candidate — handles "Company- City, ST" patterns too.
+    if (!company && title) {
+      for (let back = 1; back <= 15; back++) {
+        const idx = dateIdx - back
+        if (idx < 0) break
+        const ln = lines[idx].trim()
+        if (!ln) continue
+        if (isBulletLine(ln)) continue
+        if (looksLikeSeparator(ln)) continue
+        if (looksLikeDateRange(ln)) continue  // previous role's date — keep looking past it
+        if (TITLE_KEYWORD_RE.test(ln) && !/ - /.test(ln)) continue  // another role's title line
+        if (/^[A-Z][A-Z\s&/\-]{3,}$/.test(ln)) break  // section header (e.g. EXPERIENCE) → stop
+        const candidate = cleanCompanyLine(ln)
+        if (candidate && candidate.length > 1 && !looksLikeLocation(candidate) && !TITLE_KEYWORD_RE.test(candidate)) {
+          company = candidate
+          break
+        }
       }
     }
 

@@ -249,6 +249,48 @@ describe('multiple roles under one company header', () => {
     expect(roles[2].company).toMatch(/AvePoint/i)
   })
 
+  it('finds company via extended lookback when blank line separates company from title (separate-date format)', () => {
+    // Wolfson pattern: company header → blank line → title → date (date on its own line)
+    // The blank line means rawEffective2="" and skip2=false, so the short-range recovery
+    // never fires. The extended lookback must step over the blank to find the company.
+    const text = [
+      'Staffbase- New York, NY',
+      '',
+      'Sales Manager, Large Enterprise',
+      '1/25-Present',
+      '• Built strategic account plans across Financial Services vertical',
+    ].join('\n')
+
+    const roles = extractExperience(text)
+    expect(roles).toHaveLength(1)
+    expect(roles[0].title).toBe('Sales Manager, Large Enterprise')
+    expect(roles[0].company).toBe('Staffbase')
+  })
+
+  it('finds shared company for 2nd role under same company (separate-date format)', () => {
+    // Wolfson pattern: company appears once; two separate-date roles share it.
+    // Role 2's company is many lines back — past bullets and a date line from role 1.
+    const text = [
+      'Staffbase- New York, NY',
+      '',
+      'Sales Manager, Large Enterprise',
+      '1/25-Present',
+      '• Built strategic account plans',
+      '• Closed $4M in new ARR',
+      '',
+      'Large Enterprise Account Executive',
+      '1/24-12/24',
+      '• Sourced and closed 12 enterprise deals',
+    ].join('\n')
+
+    const roles = extractExperience(text)
+    expect(roles).toHaveLength(2)
+    expect(roles[0].title).toBe('Sales Manager, Large Enterprise')
+    expect(roles[0].company).toBe('Staffbase')
+    expect(roles[1].title).toBe('Large Enterprise Account Executive')
+    expect(roles[1].company).toBe('Staffbase')
+  })
+
   it('does not inherit company across a section header boundary', () => {
     const text = [
       'EXPERIENCE',

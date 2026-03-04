@@ -405,6 +405,7 @@ function ScorePanel({
   newlyResolvedIds,
   availableFixes,
   onApplyFix,
+  hideMobileRescore = false,
 }: {
   result: ScoreResult
   initialScore: number
@@ -416,6 +417,7 @@ function ScorePanel({
   newlyResolvedIds: Set<string>
   availableFixes: AvailableFix[]
   onApplyFix: (id: AvailableFix['id']) => void
+  hideMobileRescore?: boolean
 }) {
   const [keywordsOpen, setKeywordsOpen] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
@@ -549,16 +551,18 @@ function ScorePanel({
         {/* Separator */}
         <div className="border-t border-[#EEEEEE] mb-4" />
 
-        {/* Re-score button */}
-        <Button variant="primary" size="md" className="w-full justify-center" onClick={onRescore} disabled={isRescoring}>
-          {isRescoring ? (
-            <span className="flex items-center gap-2">
-              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Scoring…
-            </span>
-          ) : 'Re-score →'}
-        </Button>
-        <p className="text-[10px] text-[#BBBBBB] text-center mt-1.5">Saves automatically before re-scoring</p>
+        {/* Re-score button — hidden on mobile (bottom bar owns it there) */}
+        <div className={hideMobileRescore ? 'hidden lg:block' : ''}>
+          <Button variant="primary" size="md" className="w-full justify-center" onClick={onRescore} disabled={isRescoring}>
+            {isRescoring ? (
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Scoring…
+              </span>
+            ) : 'Re-score →'}
+          </Button>
+          <p className="text-[10px] text-[#BBBBBB] text-center mt-1.5">Saves automatically before re-scoring</p>
+        </div>
       </div>
 
       {/* Checklist */}
@@ -764,6 +768,7 @@ function ScorePageContent() {
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [showPassBanner, setShowPassBanner] = useState(false)
   const [newlyResolvedIds, setNewlyResolvedIds] = useState<Set<string>>(new Set())
+  const [activeTab, setActiveTab] = useState<'edit' | 'score'>('score')
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestCV = useRef<StructuredCV | null>(null)
@@ -979,12 +984,57 @@ function ScorePageContent() {
   // ── Critical banners ──────────────────────────────────────────────────────
   const criticalConcerns = result.criticalConcerns ?? []
 
+  // ── Shared panel props ────────────────────────────────────────────────────
+  const scorePanelProps = {
+    result,
+    initialScore,
+    isRescoring,
+    onRescore: handleRescore,
+    cvId: cvId!,
+    showPassBanner,
+    onDismissPassBanner: () => setShowPassBanner(false),
+    newlyResolvedIds,
+    availableFixes,
+    onApplyFix: handleApplyFix,
+  } as const
+
+  const editorPanelProps = {
+    cv,
+    saveStatus,
+    onSummaryChange: updateSummary,
+    onRoleChange: updateRole,
+    onSkillsChange: updateSkills,
+    onEducationChange: updateEducation,
+    onCertsChange: updateCerts,
+    cvId: cvId!,
+  } as const
+
+  const ringColor = result.passFail ? '#16A34A' : result.overallScore >= 50 ? '#D97706' : '#DC2626'
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <main className="min-h-screen bg-[#FFF7F2]">
+    <main className="min-h-screen bg-[#FFF7F2] pb-20 lg:pb-0">
       <Header isSignedIn />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {/* ── Mobile tab bar ── */}
+      <div className="lg:hidden sticky top-0 z-20 bg-white border-b border-[#DDDDDD]">
+        <div className="max-w-7xl mx-auto px-4 flex">
+          <button
+            onClick={() => setActiveTab('score')}
+            className={`flex-1 py-3.5 text-sm font-semibold text-center border-b-2 transition-colors ${activeTab === 'score' ? 'border-[#FF6B00] text-[#FF6B00]' : 'border-transparent text-[#999999]'}`}
+          >
+            Score &amp; Checklist
+          </button>
+          <button
+            onClick={() => setActiveTab('edit')}
+            className={`flex-1 py-3.5 text-sm font-semibold text-center border-b-2 transition-colors ${activeTab === 'edit' ? 'border-[#FF6B00] text-[#FF6B00]' : 'border-transparent text-[#999999]'}`}
+          >
+            Edit CV
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Critical banners */}
         {criticalConcerns.length > 0 && (
           <div className="mb-5 flex flex-col gap-2">
@@ -994,38 +1044,51 @@ function ScorePageContent() {
           </div>
         )}
 
-        {/* Two-panel layout */}
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* Left: score panel */}
-          <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
-            <ScorePanel
-              result={result}
-              initialScore={initialScore}
-              isRescoring={isRescoring}
-              onRescore={handleRescore}
-              cvId={cvId!}
-              showPassBanner={showPassBanner}
-              onDismissPassBanner={() => setShowPassBanner(false)}
-              newlyResolvedIds={newlyResolvedIds}
-              availableFixes={availableFixes}
-              onApplyFix={handleApplyFix}
-            />
-          </div>
+        {/* ── Mobile: single active tab ── */}
+        <div className="lg:hidden">
+          {activeTab === 'score' ? (
+            <ScorePanel {...scorePanelProps} hideMobileRescore />
+          ) : (
+            <EditorPanel {...editorPanelProps} />
+          )}
+        </div>
 
-          {/* Right: editor panel */}
+        {/* ── Desktop: two-panel layout ── */}
+        <div className="hidden lg:flex gap-6 items-start">
+          <div className="w-80 xl:w-96 flex-shrink-0 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+            <ScorePanel {...scorePanelProps} />
+          </div>
           <div className="flex-1 min-w-0">
-            <EditorPanel
-              cv={cv}
-              saveStatus={saveStatus}
-              onSummaryChange={updateSummary}
-              onRoleChange={updateRole}
-              onSkillsChange={updateSkills}
-              onEducationChange={updateEducation}
-              onCertsChange={updateCerts}
-              cvId={cvId!}
-            />
+            <EditorPanel {...editorPanelProps} />
           </div>
         </div>
+      </div>
+
+      {/* ── Mobile sticky bottom bar ── */}
+      <div
+        className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#DDDDDD] px-4 py-2.5 flex items-center gap-3 z-30"
+        style={{ boxShadow: '0 -2px 12px rgba(0,0,0,0.08)' }}
+      >
+        <div
+          className="w-10 h-10 rounded-full border-[3px] flex items-center justify-center text-sm font-bold text-[#222222] flex-shrink-0"
+          style={{ borderColor: ringColor }}
+        >
+          {result.overallScore}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold" style={{ color: ringColor }}>
+            {result.passFail ? '✓ Recruiter-ready' : '✕ Needs work'}
+          </p>
+          <p className="text-[10px] text-[#999999] truncate">{ROLE_LABELS[result.targetRole]}</p>
+        </div>
+        <Button variant="primary" size="sm" onClick={handleRescore} disabled={isRescoring} className="flex-shrink-0">
+          {isRescoring ? (
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Scoring…
+            </span>
+          ) : 'Re-score →'}
+        </Button>
       </div>
 
       <PaywallModal isOpen={paywallOpen} onClose={() => setPaywallOpen(false)} action="rescore" />

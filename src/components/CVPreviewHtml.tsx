@@ -110,7 +110,7 @@ function ClassicPreview({ structured, contact }: { structured: StructuredCV; con
       {/* Experience */}
       {structured.experience?.length > 0 && (
         <Section heading="Experience" classic>
-          {structured.experience.slice(0, 6).map((role, i) => (
+          {structured.experience.map((role, i) => (
             <div key={i} style={{ marginBottom: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1px' }}>
                 <span style={{ fontWeight: 700, fontSize: '9px', color: '#111111', flex: 1, paddingRight: '8px' }}>{role.title}</span>
@@ -119,7 +119,7 @@ function ClassicPreview({ structured, contact }: { structured: StructuredCV; con
               {role.company && (
                 <div style={{ fontSize: '8.5px', color: '#555555', fontStyle: 'italic', marginBottom: '3px' }}>{role.company}</div>
               )}
-              {role.bullets?.slice(0, 3).map((bullet, j) => (
+              {role.bullets?.map((bullet, j) => (
                 <div key={j} style={{ display: 'flex', marginBottom: '2px', paddingLeft: '4px' }}>
                   <span style={{ width: '10px', fontSize: '9px', color: '#444444', flexShrink: 0 }}>•</span>
                   <span style={{ fontSize: '9px', color: '#333333', flex: 1 }}>{bullet}</span>
@@ -213,7 +213,7 @@ function ModernPreview({ structured, contact }: { structured: StructuredCV; cont
       {/* Experience */}
       {structured.experience?.length > 0 && (
         <Section heading="Experience" orange>
-          {structured.experience.slice(0, 6).map((role, i) => (
+          {structured.experience.map((role, i) => (
             <div key={i} style={{ marginBottom: '9px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1px' }}>
                 <span style={{ fontWeight: 700, fontSize: '9.5px', color: DARK, flex: 1, paddingRight: '8px' }}>{role.title}</span>
@@ -222,7 +222,7 @@ function ModernPreview({ structured, contact }: { structured: StructuredCV; cont
               {role.company && (
                 <div style={{ fontSize: '8.5px', color: MUTED, marginBottom: '4px' }}>{role.company}</div>
               )}
-              {role.bullets?.slice(0, 3).map((bullet, j) => (
+              {role.bullets?.map((bullet, j) => (
                 <div key={j} style={{ display: 'flex', marginBottom: '2.5px', paddingLeft: '2px' }}>
                   <span style={{ width: '10px', fontSize: '9px', color: ORANGE, flexShrink: 0 }}>–</span>
                   <span style={{ fontSize: '9px', color: '#333333', flex: 1 }}>{bullet}</span>

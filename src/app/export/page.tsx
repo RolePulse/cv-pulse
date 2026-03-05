@@ -25,6 +25,22 @@ const TEMPLATES = [
   },
 ]
 
+// ── Placeholder detection ─────────────────────────────────────────────────────
+// Counts [bracket] placeholders in the CV (from quick-fix auto-inserts).
+// A CV with unfilled placeholders should warn the user before they download.
+
+function countPlaceholders(structured: StructuredCV): number {
+  const re = /\[.+?\]/
+  let count = 0
+  if (structured.summary && re.test(structured.summary)) count++
+  for (const role of structured.experience ?? []) {
+    for (const bullet of role.bullets ?? []) {
+      if (re.test(bullet)) count++
+    }
+  }
+  return count
+}
+
 // ── Main content ──────────────────────────────────────────────────────────────
 
 function ExportContent() {
@@ -168,6 +184,31 @@ function ExportContent() {
             </a>
           </div>
         )}
+
+        {/* Placeholder warning — shown when CV has unfilled [bracket] bullets */}
+        {cvData && countPlaceholders(cvData.structured) > 0 && (() => {
+          const n = countPlaceholders(cvData.structured)
+          return (
+            <div className="mb-5 flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-[8px] px-4 py-3">
+              <span className="text-amber-500 text-lg leading-none mt-0.5 flex-shrink-0">⚠️</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800 mb-0.5">
+                  {n} unfilled placeholder{n !== 1 ? 's' : ''} in your CV
+                </p>
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  Your CV contains <code className="bg-amber-100 px-1 rounded text-[10px]">[bracketed]</code> placeholder text from quick fixes.
+                  These will appear verbatim in the downloaded PDF.{' '}
+                  <a
+                    href={resolvedCvId ? `/score?cvId=${resolvedCvId}` : '/score'}
+                    className="font-semibold underline hover:text-amber-900"
+                  >
+                    Go back and fill them in →
+                  </a>
+                </p>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Template cards */}
         {(resolving || resolvedCvId) && (

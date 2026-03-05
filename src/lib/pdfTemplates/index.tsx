@@ -262,7 +262,7 @@ function ClassicTemplate({
         {/* Summary */}
         {structured.summary?.trim() && (
           <View style={classicStyles.section}>
-            <Text style={classicStyles.sectionHeading}>Summary</Text>
+            <Text style={classicStyles.sectionHeading} minPresenceAhead={80}>Summary</Text>
             <Text style={classicStyles.summary}>{structured.summary.trim()}</Text>
           </View>
         )}
@@ -270,9 +270,9 @@ function ClassicTemplate({
         {/* Experience */}
         {structured.experience?.length > 0 && (
           <View style={classicStyles.section}>
-            <Text style={classicStyles.sectionHeading}>Experience</Text>
+            <Text style={classicStyles.sectionHeading} minPresenceAhead={80}>Experience</Text>
             {structured.experience.map((role, i) => (
-              <View key={i} style={classicStyles.roleBlock}>
+              <View key={i} style={classicStyles.roleBlock} wrap={false}>
                 <View style={classicStyles.roleHeader}>
                   <Text style={classicStyles.roleTitle}>{role.title}</Text>
                   <Text style={classicStyles.roleDates}>{formatDateRange(role)}</Text>
@@ -294,7 +294,7 @@ function ClassicTemplate({
         {/* Skills */}
         {structured.skills?.length > 0 && (
           <View style={classicStyles.section}>
-            <Text style={classicStyles.sectionHeading}>Skills</Text>
+            <Text style={classicStyles.sectionHeading} minPresenceAhead={80}>Skills</Text>
             <Text style={classicStyles.skillsText}>
               {structured.skills.join('  ·  ')}
             </Text>
@@ -304,7 +304,7 @@ function ClassicTemplate({
         {/* Education */}
         {structured.education?.length > 0 && (
           <View style={classicStyles.section}>
-            <Text style={classicStyles.sectionHeading}>Education</Text>
+            <Text style={classicStyles.sectionHeading} minPresenceAhead={80}>Education</Text>
             {structured.education.map((edu, i) => (
               <View key={i} style={classicStyles.eduBlock}>
                 <View style={classicStyles.eduRow}>
@@ -322,7 +322,7 @@ function ClassicTemplate({
         {/* Certifications */}
         {structured.certifications?.length > 0 && (
           <View style={classicStyles.section}>
-            <Text style={classicStyles.sectionHeading}>Certifications</Text>
+            <Text style={classicStyles.sectionHeading} minPresenceAhead={80}>Certifications</Text>
             {structured.certifications.map((cert, i) => (
               <Text key={i} style={classicStyles.certItem}>• {cert}</Text>
             ))}
@@ -504,7 +504,7 @@ function ModernTemplate({
         {/* Summary */}
         {structured.summary?.trim() && (
           <View style={modernStyles.section}>
-            <Text style={modernStyles.sectionHeading}>Summary</Text>
+            <Text style={modernStyles.sectionHeading} minPresenceAhead={80}>Summary</Text>
             <Text style={modernStyles.summary}>{structured.summary.trim()}</Text>
           </View>
         )}
@@ -512,9 +512,9 @@ function ModernTemplate({
         {/* Experience */}
         {structured.experience?.length > 0 && (
           <View style={modernStyles.section}>
-            <Text style={modernStyles.sectionHeading}>Experience</Text>
+            <Text style={modernStyles.sectionHeading} minPresenceAhead={80}>Experience</Text>
             {structured.experience.map((role, i) => (
-              <View key={i} style={modernStyles.roleBlock}>
+              <View key={i} style={modernStyles.roleBlock} wrap={false}>
                 <View style={modernStyles.roleHeader}>
                   <Text style={modernStyles.roleTitle}>{role.title}</Text>
                   <Text style={modernStyles.roleDates}>{formatDateRange(role)}</Text>
@@ -536,7 +536,7 @@ function ModernTemplate({
         {/* Skills */}
         {structured.skills?.length > 0 && (
           <View style={modernStyles.section}>
-            <Text style={modernStyles.sectionHeading}>Skills</Text>
+            <Text style={modernStyles.sectionHeading} minPresenceAhead={80}>Skills</Text>
             <Text style={modernStyles.skillsText}>
               {structured.skills.join('  ·  ')}
             </Text>
@@ -546,7 +546,7 @@ function ModernTemplate({
         {/* Education */}
         {structured.education?.length > 0 && (
           <View style={modernStyles.section}>
-            <Text style={modernStyles.sectionHeading}>Education</Text>
+            <Text style={modernStyles.sectionHeading} minPresenceAhead={80}>Education</Text>
             {structured.education.map((edu, i) => (
               <View key={i} style={modernStyles.eduBlock}>
                 <View style={modernStyles.eduRow}>
@@ -564,7 +564,7 @@ function ModernTemplate({
         {/* Certifications */}
         {structured.certifications?.length > 0 && (
           <View style={modernStyles.section}>
-            <Text style={modernStyles.sectionHeading}>Certifications</Text>
+            <Text style={modernStyles.sectionHeading} minPresenceAhead={80}>Certifications</Text>
             {structured.certifications.map((cert, i) => (
               <Text key={i} style={modernStyles.certItem}>– {cert}</Text>
             ))}

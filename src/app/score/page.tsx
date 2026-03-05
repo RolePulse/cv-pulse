@@ -361,6 +361,63 @@ function RoleCard({
   )
 }
 
+// ── Critical banners block ────────────────────────────────────────────────────
+// Collapses multiple critical issues into a single banner to avoid alarming
+// users with a wall of red before they've even seen their score.
+
+function CriticalBannersBlock({ concerns }: { concerns: string[] }) {
+  const [expanded, setExpanded] = useState(false)
+
+  if (concerns.length === 0) return null
+
+  if (concerns.length === 1) {
+    return <AlertBanner type="error" message={`Critical: ${concerns[0]}`} />
+  }
+
+  // 2+ issues — single collapsible banner
+  return (
+    <div className="w-full border-l-4 border-l-[#DC2626] bg-red-50 px-4 py-3">
+      <div className="flex items-start gap-3">
+        <span className="text-sm font-semibold mt-px text-red-800 flex-shrink-0">✕</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-red-800">
+              {concerns.length} critical issues found
+            </p>
+            <button
+              onClick={() => setExpanded(e => !e)}
+              className="text-xs text-red-700 hover:text-red-900 font-medium flex-shrink-0 transition-colors cursor-pointer"
+            >
+              {expanded ? 'Show less ▲' : 'Show all ▼'}
+            </button>
+          </div>
+          <p className="text-sm text-red-800 mt-0.5">{concerns[0]}</p>
+          {expanded ? (
+            <ul className="mt-2 space-y-1">
+              {concerns.slice(1).map((c, i) => (
+                <li key={i} className="text-sm text-red-800 flex gap-1.5">
+                  <span className="flex-shrink-0 mt-px">•</span>
+                  <span>{c}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-red-700 mt-1">
+              +{concerns.length - 1} more — see checklist below or{' '}
+              <button
+                onClick={() => setExpanded(true)}
+                className="underline cursor-pointer hover:no-underline"
+              >
+                show here
+              </button>
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Next fix nudge ────────────────────────────────────────────────────────────
 
 function NextFixCard({ items, onFix }: { items: ScoreResult['checklist']; onFix?: () => void }) {
@@ -1213,22 +1270,10 @@ function ScorePageContent() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Critical banners — on mobile show first only (reduces banner stacking above the fold) */}
+        {/* Critical banners — collapsed into single banner regardless of count */}
         {criticalConcerns.length > 0 && (
-          <div className="mb-5 flex flex-col gap-2">
-            <AlertBanner type="error" message={`Critical: ${criticalConcerns[0]}`} />
-            {criticalConcerns.length > 1 && (
-              <>
-                <p className="md:hidden text-xs text-[#DC2626] pl-1 -mt-1">
-                  +{criticalConcerns.length - 1} more critical issue{criticalConcerns.length > 2 ? 's' : ''} — see checklist below
-                </p>
-                <div className="hidden md:flex flex-col gap-2">
-                  {criticalConcerns.slice(1).map((concern, i) => (
-                    <AlertBanner key={i + 1} type="error" message={`Critical: ${concern}`} />
-                  ))}
-                </div>
-              </>
-            )}
+          <div className="mb-5">
+            <CriticalBannersBlock concerns={criticalConcerns} />
           </div>
         )}
 

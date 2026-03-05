@@ -510,8 +510,16 @@ function ScorePanel({
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${passFail ? 'bg-green-100 text-[#16A34A]' : 'bg-red-100 text-[#DC2626]'}`}>
               {passFail ? '✓ Recruiter-ready' : '✕ Needs work'}
             </span>
-            <p className="text-xs text-[#666666]">
-              Scored for <span className="font-semibold text-[#222222]">{ROLE_LABELS[targetRole]}</span>
+            {/* Threshold context — only shown when failing, so users know exactly what they're aiming for */}
+            {!passFail && (
+              <p className="text-[10px] text-[#AAAAAA] tracking-wide">
+                Recruiter threshold: <span className="font-semibold text-[#888888]">70 / 100</span>
+              </p>
+            )}
+            {/* Role label on its own line — prevents mid-phrase wrapping on narrow panels */}
+            <p className="text-xs text-center">
+              <span className="text-[#888888]">Scored for</span><br />
+              <span className="font-semibold text-[#222222]">{ROLE_LABELS[targetRole]}</span>
             </p>
             {improved && (
               <p className="text-xs font-semibold text-[#FF6B00]">{initialScore} → {overallScore}</p>
@@ -1137,19 +1145,45 @@ function ScorePageContent() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Critical banners */}
+        {/* Critical banners — on mobile show first only (reduces banner stacking above the fold) */}
         {criticalConcerns.length > 0 && (
           <div className="mb-5 flex flex-col gap-2">
-            {criticalConcerns.map((concern, i) => (
-              <AlertBanner key={i} type="error" message={`Critical: ${concern}`} />
-            ))}
+            <AlertBanner type="error" message={`Critical: ${criticalConcerns[0]}`} />
+            {criticalConcerns.length > 1 && (
+              <>
+                <p className="md:hidden text-xs text-[#DC2626] pl-1 -mt-1">
+                  +{criticalConcerns.length - 1} more critical issue{criticalConcerns.length > 2 ? 's' : ''} — see checklist below
+                </p>
+                <div className="hidden md:flex flex-col gap-2">
+                  {criticalConcerns.slice(1).map((concern, i) => (
+                    <AlertBanner key={i + 1} type="error" message={`Critical: ${concern}`} />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
         {/* ── Mobile: single active tab ── */}
         <div className="md:hidden">
           {activeTab === 'score' ? (
-            <ScorePanel {...scorePanelProps} hideMobileRescore />
+            <>
+              <ScorePanel {...scorePanelProps} hideMobileRescore />
+              {/* Demo-only nudge: point users toward the Edit CV tab */}
+              {isDemo && (
+                <div className="mt-3 rounded-[8px] bg-[#FFF3E8] border border-[#FFD4A8] px-4 py-3 flex items-center justify-between gap-3">
+                  <p className="text-xs text-[#CC5500] font-medium leading-snug">
+                    See the gaps? Fix them in the CV editor.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('edit')}
+                    className="text-xs font-semibold text-white bg-[#FF6B00] hover:bg-[#E05A00] rounded-[6px] px-3 py-1.5 transition-colors cursor-pointer flex-shrink-0"
+                  >
+                    Edit CV →
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <EditorPanel {...editorPanelProps} />
           )}

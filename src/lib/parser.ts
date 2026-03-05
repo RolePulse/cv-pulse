@@ -30,10 +30,16 @@ export function collapseSpacedChars(line: string): string {
   // Matches: single chars (A-Z, 0-9) separated by 1-3 spaces, 4+ chars total
   // e.g. "E M P L O Y M E N T" or "O C T O B E R   2 0 2 3"
   if (/^[A-Z0-9]([ ]{1,3}[A-Z0-9]){3,}/.test(trimmed)) {
-    // Collapse: remove spaces between individual chars, keep multi-space as single space
-    return trimmed
-      .replace(/([A-Z0-9]) ([A-Z0-9])/g, '$1$2')  // "A B" → "AB"
-      .replace(/([A-Z0-9])  +([A-Z0-9])/g, '$1 $2') // "AB  CD" → "AB CD"
+    // Collapse single-space pairs iteratively (one pass only catches alternating pairs)
+    // e.g. "E M P L" → pass1: "EM PL" → pass2: "EMPL"
+    let result = trimmed
+    let prev = ''
+    while (result !== prev) {
+      prev = result
+      result = result.replace(/([A-Z0-9]) ([A-Z0-9])/g, '$1$2')
+    }
+    return result
+      .replace(/([A-Z0-9])  +([A-Z0-9])/g, '$1 $2') // "AB  CD" → "AB CD" (word gap)
       .replace(/ +/g, ' ')
       .trim()
   }
@@ -47,6 +53,9 @@ export function cleanText(raw: string): string {
     // Null bytes in PDFs are often encoding artifacts for en-dashes (date ranges, salary ranges)
     // Replace with en-dash so date parsers can find "05/2024 – Present" correctly
     .replace(/\u0000/g, '–')
+    // Non-breaking hyphen (U+2011) — visually identical to a regular hyphen but not matched by
+    // date range regexes. Normalise to a standard hyphen so "May 2021 ‑ Aug 2024" is parsed.
+    .replace(/\u2011/g, '-')
     // Strip remaining control characters (leave \n alone — handled by split/join)
     .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
     .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ')
@@ -55,6 +64,17 @@ export function cleanText(raw: string): string {
 
   return lines
     .join('\n')
+    // Normalise reversed date format "YYYY Month" → "Month YYYY" (e.g. "2022 Oct" → "Oct 2022")
+    // Uses full MONTHS_PATTERN to match both abbreviated and full month names.
+    // Common in some Asian CV templates and Microsoft Word date pickers.
+    .replace(
+      new RegExp(`\\b((?:20|19)\\d{2})\\s+(${MONTHS_PATTERN})\\.?\\b`, 'gi'),
+      '$2 $1'
+    )
+    // Normalise "toPresent" / "toCurrent" / "toNow" when "to" directly follows a digit
+    // e.g. "01/2024toPresent" → "01/2024 to Present"
+    // Uses lookbehind so only "to" is replaced (digit not consumed/modified).
+    .replace(/(?<=\d)to(?=present|current|now)/gi, ' to ')
     // Replace 8+ consecutive spaces with a newline — preserves two-column PDF layout
     // where columns are space-padded on the same row (e.g. "COMPANY         LOCATION")
     .replace(/ {8,}/g, '\n')
@@ -70,7 +90,7 @@ const SECTION_TAIL = '[\\s:_\\-\\.=]*$'
 
 const SECTION_PATTERNS: Record<string, RegExp> = {
   summary: new RegExp(`^(summary|profile|professional\\s+summary|career\\s+summary|about\\s+me|executive\\s+summary|personal\\s+statement|career\\s+objective|objective|about|career\\s+profile|professional\\s+profile|personal\\s+profile|introduction|highlights?)${SECTION_TAIL}`, 'im'),
-  experience: new RegExp(`^(experience|work\\s+experience|employment\\s+history|professional\\s+experience|work\\s+history|career\\s+history|relevant\\s+experience|employment|positions?\\s+held|professional\\s+background|career\\s+background|relevant\\s+work|work\\s+&\\s+experience|experience\\s+&\\s+skills)${SECTION_TAIL}`, 'im'),
+  experience: new RegExp(`^(experiences?|work\\s*experience|employment\\s*history|professional\\s*experiences?|work\\s*history|career\\s*history|relevant\\s*experience|employment|positions?\\s+held|professional\\s*background|career\\s*background|relevant\\s*work|work\\s+&\\s+experience|experience\\s+&\\s+skills|experience\\s*details?|professional\\s*experience\\s*&\\s*skills)${SECTION_TAIL}`, 'im'),
   education: new RegExp(`^(education|academic\\s+background|qualifications|academic\\s+history|educational\\s+background|academic\\s+qualifications|education\\s+&?\\s*training|education\\s+&?\\s*certifications?|academic\\s+achievements?)${SECTION_TAIL}`, 'im'),
   skills: new RegExp(`^(skills|technical\\s+skills|core\\s+skills|key\\s+skills|competencies|areas\\s+of\\s+expertise|expertise|core\\s+competencies|tools?\\s+&\\s+technologies|technologies|technical\\s+proficiencies?|core\\s+strengths?|areas\\s+of\\s+strength|strengths?|languages?\\s+&\\s+tools?|tech\\s+stack)${SECTION_TAIL}`, 'im'),
   certifications: new RegExp(`^(certifications?|certificates?|credentials?|licen[sc]es?|professional\\s+development|courses?|training|achievements?|awards?\\s+&\\s+achievements?|honours?|accomplishments?)${SECTION_TAIL}`, 'im'),
@@ -134,16 +154,17 @@ export const DATE_TOKEN_RE = new RegExp(
 )
 
 // A full date range: "Jan 2020 – Dec 2021" / "2019 – Present" / "2019-2022" / "Jan 2020 to Dec 2021"
-// DATE_SEP: dash/en-dash/em-dash OR " to " OR " through " OR " until " (common in US CVs)
-const DATE_SEP = `(?:\\s*[-–—]\\s*|\\s+to\\s+|\\s+through\\s+|\\s+until\\s+)`
+// DATE_SEP: dash/en-dash/em-dash OR "to" OR "through" OR "until"
+// Note: leading space is OPTIONAL to handle "10/2024to Current" (no space before "to")
+const DATE_SEP = `(?:\\s*[-–—]\\s*|\\s*to\\s+|\\s+through\\s+|\\s+until\\s+)`
 
 // DATE_PART matches any single date value — covers:
-//   "Jan 2020"   — month name + 4-digit year
+//   "Jan 2020"   — month name + 4-digit year (space optional for no-space PDFs: "Jan2020")
 //   "2020"       — bare 4-digit year
 //   "2024.09"    — YYYY.MM (dot-separated, common in Asian/European CVs e.g. Aram's format)
 //   "8/21"       — M/YY (US short: "8/21", "06/23")
 //   "06/2021"    — M/YYYY (US long: "06/2021", "5/2024")
-const DATE_PART = `(?:(?:${MONTHS_PATTERN})\\.?\\s+)?(?:(?:20|19)\\d{2}(?:\\.\\d{2})?|\\d{1,2}\\/(?:(?:20|19)\\d{2}|\\d{2}))`
+const DATE_PART = `(?:(?:${MONTHS_PATTERN})\\.?\\s*)?(?:(?:20|19)\\d{2}(?:\\.\\d{2})?|\\d{1,2}\\/(?:(?:20|19)\\d{2}|\\d{2}))`
 
 export const DATE_RANGE_RE = new RegExp(
   `${DATE_PART}${DATE_SEP}(?:${DATE_PART}|present|current|now)`,

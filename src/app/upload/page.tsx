@@ -29,6 +29,10 @@ export default function UploadPage() {
   const router = useRouter()
   const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null) // null = loading
   const [signingIn, setSigningIn] = useState(false)
+  const [magicEmail, setMagicEmail] = useState('')
+  const [magicSent, setMagicSent] = useState(false)
+  const [magicSending, setMagicSending] = useState(false)
+  const [magicError, setMagicError] = useState<string | null>(null)
   const [deletedBanner, setDeletedBanner] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [file, setFile] = useState<File | null>(null)
@@ -80,6 +84,26 @@ export default function UploadPage() {
       },
     })
     // Page will redirect — no need to setSigningIn(false)
+  }
+
+  async function handleMagicLinkSignIn(e: React.FormEvent) {
+    e.preventDefault()
+    if (!magicEmail.trim()) return
+    setMagicSending(true)
+    setMagicError(null)
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithOtp({
+      email: magicEmail.trim(),
+      options: {
+        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+      },
+    })
+    setMagicSending(false)
+    if (error) {
+      setMagicError(error.message)
+    } else {
+      setMagicSent(true)
+    }
   }
 
   const hasContent = !!file || pasteText.trim().length > 100
@@ -252,24 +276,81 @@ export default function UploadPage() {
 
         {/* Sign-in wall — shown when not authenticated */}
         {isSignedIn === false && (
-          <div className="bg-white rounded-[12px] border border-[#DDDDDD] p-8 text-center">
+          <div className="bg-white rounded-[12px] border border-[#DDDDDD] p-8">
             <div className="w-12 h-12 bg-[#FFF0E6] rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-6 h-6 text-[#FF6B00]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-[#222222] mb-2">Sign in to get started</h2>
-            <p className="text-sm text-[#666666] mb-6">
+            <h2 className="text-lg font-semibold text-[#222222] mb-2 text-center">Sign in to get started</h2>
+            <p className="text-sm text-[#666666] mb-6 text-center">
               Create a free account to upload your CV, get your score, and see exactly what to fix.
             </p>
-            <Button
-              onClick={handleGoogleSignIn}
-              disabled={signingIn}
-              className="w-full sm:w-auto"
-            >
-              {signingIn ? 'Redirecting…' : 'Sign in with Google'}
-            </Button>
-            <p className="text-xs text-[#888888] mt-4">
+
+            {magicSent ? (
+              /* ── Magic link sent confirmation ── */
+              <div className="bg-green-50 border border-green-200 rounded-[8px] p-4 mb-4">
+                <p className="text-sm font-semibold text-[#16A34A] mb-1">Check your email ✓</p>
+                <p className="text-xs text-[#555555] leading-relaxed">
+                  We&apos;ve sent a sign-in link to <strong>{magicEmail}</strong>.
+                  Click the link to sign in — check your spam folder if it doesn&apos;t arrive within a minute.
+                </p>
+                <button
+                  onClick={() => { setMagicSent(false); setMagicEmail('') }}
+                  className="text-xs text-[#888888] underline mt-3 cursor-pointer hover:text-[#FF6B00] transition-colors"
+                >
+                  Use a different email
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* ── Magic link form ── */}
+                <form onSubmit={handleMagicLinkSignIn} className="mb-4">
+                  <label className="block text-xs font-medium text-[#555555] mb-1.5">Email address</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={magicEmail}
+                      onChange={e => { setMagicEmail(e.target.value); setMagicError(null) }}
+                      placeholder="your@email.com"
+                      required
+                      className="flex-1 text-sm border border-[#DDDDDD] rounded-[8px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] text-[#222222] placeholder-[#BBBBBB] min-w-0"
+                    />
+                    <Button type="submit" disabled={magicSending || !magicEmail.trim()} className="flex-shrink-0">
+                      {magicSending ? 'Sending…' : 'Send link →'}
+                    </Button>
+                  </div>
+                  {magicError && (
+                    <p className="text-xs text-[#DC2626] mt-2">{magicError}</p>
+                  )}
+                </form>
+
+                {/* ── Divider ── */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-1 h-px bg-[#EEEEEE]" />
+                  <span className="text-xs text-[#BBBBBB]">or</span>
+                  <div className="flex-1 h-px bg-[#EEEEEE]" />
+                </div>
+
+                {/* ── Google button ── */}
+                <button
+                  onClick={handleGoogleSignIn}
+                  disabled={signingIn}
+                  className="w-full flex items-center justify-center gap-2.5 border border-[#DDDDDD] rounded-[8px] px-4 py-2.5 text-sm font-medium text-[#333333] bg-white hover:bg-[#FAFAFA] transition-colors disabled:opacity-60 cursor-pointer"
+                >
+                  {/* Google G icon */}
+                  <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                    <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                    <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+                    <path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
+                    <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+                  </svg>
+                  {signingIn ? 'Redirecting…' : 'Continue with Google'}
+                </button>
+              </>
+            )}
+
+            <p className="text-xs text-[#AAAAAA] mt-5 text-center">
               By signing in you agree to our{' '}
               <Link href="/terms" className="underline hover:text-[#FF6B00]">Terms</Link>
               {' '}and{' '}

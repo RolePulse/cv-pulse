@@ -42,7 +42,20 @@ const SKIP_PATTERNS = [
   /P60_/, /ResInv2025/,
   /763F271A/i, /B80FE762/i, /BDB4978B/i, /F049E176/i, // UUIDs — offer docs
   /Guesty.Assignment/i, /Mia.McClain.*SC/i, /SC.Skill.Assess/i,
+  // ── Confirmed non-CV files (verified by content inspection 2026-03-05) ───
+  /^12 month term\.pdf$/i,                    // vehicle preparation inspection doc
+  /Contractor Agreement.*Joaquin/i,            // consulting contract, not a CV
+  /\.docx\.pdf$/,                              // Word→PDF conversions: all are employment letters
+                                               // (RepeatMD offer letters named as candidate names)
 ]
+
+// CVs that are genuine but unfixable with our current parser — excluded from
+// zero-role anomaly tracking (not excluded from testing entirely).
+// Reason recorded for each so we can revisit if parser improves.
+const KNOWN_UNFIXABLE: Record<string, string> = {
+  'ALEX KLOTZ - RESUME 2K25.pdf': 'Deliberately dateless CV — no years anywhere; date-anchored parser cannot extract roles without dates',
+  'Quinlan Noble CV.pdf': 'Corrupted font encoding — text garbled throughout (e.g. "xunding", "zesponsible"); unfixable at parse layer',
+}
 
 function isLikelyCv(filename: string): boolean {
   return !SKIP_PATTERNS.some(p => p.test(filename))
@@ -118,6 +131,8 @@ if (!existsSync(DOWNLOADS)) {
       const avgConf = pass.length ? Math.round(pass.reduce((a, b) => a + b.confidence, 0) / pass.length) : 0
       const avgRoles = pass.length ? (pass.reduce((a, b) => a + b.roles, 0) / pass.length).toFixed(1) : 0
       const zeroRoles = pass.filter(r => r.roles === 0)
+      const knownUnfixableZero = zeroRoles.filter(r => r.file in KNOWN_UNFIXABLE)
+      const genuineZero = zeroRoles.filter(r => !(r.file in KNOWN_UNFIXABLE))
 
       console.log('\n' + '═'.repeat(80))
       console.log('📊  BATCH CV PARSE — FULL REPORT')
@@ -129,7 +144,10 @@ if (!existsSync(DOWNLOADS)) {
       console.log(`  💥 Errors:          ${error.length}`)
       console.log(`  Avg conf (passing): ${avgConf}`)
       console.log(`  Avg roles (passing):${avgRoles}`)
-      console.log(`  Zero roles detected:${zeroRoles.length}`)
+      console.log(`  Zero roles (genuine anomalies): ${genuineZero.length}`)
+      if (knownUnfixableZero.length) {
+        console.log(`  Zero roles (known unfixable):   ${knownUnfixableZero.length}`)
+      }
 
       if (low.length) {
         console.log('\n⚠️  LOW CONFIDENCE:')
@@ -143,9 +161,13 @@ if (!existsSync(DOWNLOADS)) {
         console.log('\n💥 ERRORS:')
         error.forEach(r => console.log(`  - ${r.file}: ${r.failReason}`))
       }
-      if (zeroRoles.length) {
-        console.log('\n⚠️  PASSED BUT 0 ROLES DETECTED:')
-        zeroRoles.forEach(r => console.log(`  [conf=${r.confidence}] ${r.file}`))
+      if (genuineZero.length) {
+        console.log('\n⚠️  PASSED BUT 0 ROLES DETECTED (genuine anomalies):')
+        genuineZero.forEach(r => console.log(`  [conf=${r.confidence}] ${r.file}`))
+      }
+      if (knownUnfixableZero.length) {
+        console.log('\nℹ️  KNOWN UNFIXABLE (0 roles — excluded from anomaly count):')
+        knownUnfixableZero.forEach(r => console.log(`  [conf=${r.confidence}] ${r.file}\n       Reason: ${KNOWN_UNFIXABLE[r.file]}`))
       }
       console.log('═'.repeat(80))
 

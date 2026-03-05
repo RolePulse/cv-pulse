@@ -114,6 +114,7 @@ function JDMatchContent() {
   const [isPaywalled, setIsPaywalled] = useState(false)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [resolvedCvId, setResolvedCvId] = useState<string | null>(cvId)
+  const [isSignedIn, setIsSignedIn] = useState(false)
 
   // If no cvId in URL, fetch the user's latest CV
   useEffect(() => {
@@ -138,11 +139,12 @@ function JDMatchContent() {
     fetchCurrentCV()
   }, [resolvedCvId])
 
-  // Fetch usage on mount to show remaining checks
+  // Fetch usage on mount to show remaining checks (also resolves auth state for header)
   useEffect(() => {
     async function fetchUsage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
+      setIsSignedIn(!!user)
       if (!user) return
 
       const { data: usage } = await supabase
@@ -205,7 +207,7 @@ function JDMatchContent() {
 
   return (
     <div className="min-h-screen bg-[#FFF7F2]">
-      <Header isSignedIn />
+      <Header isSignedIn={isSignedIn} />
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
         {/* Back navigation */}

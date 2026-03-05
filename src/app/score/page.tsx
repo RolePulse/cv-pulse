@@ -799,7 +799,7 @@ function EditorPanel({
 
       {/* Export CTA */}
       <div className="pt-2">
-        <Button variant="secondary" size="md" className="w-full justify-center" onClick={() => router.push(`/export?cvId=${cvId}`)}>
+        <Button variant="secondary" size="md" className="w-full justify-center" onClick={() => router.push(`/export?cv=${cvId}`)}>
           Export PDF →
         </Button>
       </div>
@@ -891,7 +891,9 @@ function ScorePageContent() {
         latestCV.current = structured
         setResult(scoreResult)
         resultRef.current = scoreResult
-        setInitialScore(scoreResult.overallScore)
+        // Seed from the API's initialScore (first-ever score for this CV)
+        // so the "X → Y" arc persists across page refreshes and navigations.
+        setInitialScore(scoreData.initialScore ?? scoreResult.overallScore)
       } catch {
         setError('Network error — please check your connection and try again.')
       }

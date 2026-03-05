@@ -501,7 +501,7 @@ export default function UploadPage() {
               </span>
             </label>
             {termsError && (
-              <p className="text-xs text-[#DC2626] mt-1.5 ml-6.5">
+              <p className="text-xs text-[#DC2626] mt-1.5 ml-6">
                 Please accept the Terms of Service and Privacy Policy to continue.
               </p>
             )}

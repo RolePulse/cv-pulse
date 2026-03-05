@@ -42,6 +42,33 @@ export async function POST(
     .maybeSingle()
 
   if (existing) {
+    // Refresh the redacted summary with the latest score so the share link
+    // always reflects the user's most recent result after re-scoring.
+    const { data: latestScoreForRefresh } = await supabase
+      .from('scores')
+      .select('overall_score, pass_fail, bucket_scores_json, checklist_json, created_at')
+      .eq('cv_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (latestScoreForRefresh) {
+      const freshSummary = buildRedactedSummary(
+        {
+          overall_score: latestScoreForRefresh.overall_score,
+          pass_fail: latestScoreForRefresh.pass_fail,
+          bucket_scores_json: latestScoreForRefresh.bucket_scores_json as BucketScores,
+          checklist_json: (latestScoreForRefresh.checklist_json ?? []) as ChecklistItem[],
+          created_at: latestScoreForRefresh.created_at,
+        },
+        cv.target_role
+      )
+      await supabase
+        .from('share_links')
+        .update({ redacted_summary_json: freshSummary })
+        .eq('share_token', existing.share_token)
+    }
+
     // Log fetch of existing link
     await supabase.from('events').insert({
       event_name: 'share_link_fetched',

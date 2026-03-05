@@ -53,13 +53,19 @@ export async function POST(
   // Only forced re-scores count against the usage limit and create a new score row.
   const forceRescore = request.headers.get('x-force-rescore') === 'true'
 
-  // ── Check if a score already exists ──────────────────────────────────────
-  const { count: existingScoreCount } = await supabase
+  // ── Check if a score already exists (and capture the first score for initialScore) ──
+  // We fetch the first score row (ordered ascending) so we can always return
+  // initialScore — letting the UI show the "X → Y" improvement arc correctly
+  // even after the user navigates away and back.
+  const { data: firstScoreRows } = await supabase
     .from('scores')
-    .select('id', { count: 'exact', head: true })
+    .select('id, overall_score')
     .eq('cv_id', id)
+    .order('created_at', { ascending: true })
+    .limit(1)
 
-  const isFirstScore = (existingScoreCount ?? 0) === 0
+  const firstExistingScore = firstScoreRows?.[0] ?? null
+  const isFirstScore = !firstExistingScore
 
   // ── Idempotent view gate ──────────────────────────────────────────────────
   // No force flag = user is just viewing results (page load, navigation).
@@ -70,7 +76,12 @@ export async function POST(
       cv.raw_text,
       cv.target_role as TargetRole,
     )
-    return NextResponse.json({ ok: true, scoreId: null, result })
+    return NextResponse.json({
+      ok: true,
+      scoreId: null,
+      result,
+      initialScore: firstExistingScore.overall_score,
+    })
   }
 
   // ── Score ─────────────────────────────────────────────────────────────────
@@ -137,10 +148,14 @@ export async function POST(
   })
 
   // ── Return full result ────────────────────────────────────────────────────
+  // initialScore: the very first score ever recorded for this CV.
+  // On first score, that's the score we just computed. On re-scores, it's
+  // the first historical row — lets the UI show "54 → 78" even after refresh.
   return NextResponse.json({
     ok: true,
     scoreId: score.id,
     result,
+    initialScore: isFirstScore ? result.overallScore : firstExistingScore!.overall_score,
   })
 }
 

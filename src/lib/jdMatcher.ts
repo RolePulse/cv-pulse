@@ -54,6 +54,14 @@ const ATS_KEYWORDS: Record<TargetRole, string[]> = {
     'team building', 'executive', 'growth', 'market expansion', 'scaling',
     'c-suite',
   ],
+  RevOps: [
+    'revenue operations', 'revops', 'sales operations', 'salesforce', 'crm',
+    'forecasting', 'pipeline management', 'territory planning', 'quota setting',
+    'attribution', 'data quality', 'process optimisation', 'process optimization',
+    'reporting', 'dashboards', 'workflow automation', 'tech stack', 'hubspot',
+    'sales ops', 'marketing ops', 'pipeline hygiene', 'gtm operations',
+    'compensation planning', 'deal desk', 'renewal ops',
+  ],
 }
 
 const ROLE_TOOLS: Record<TargetRole, string[]> = {
@@ -62,6 +70,7 @@ const ROLE_TOOLS: Record<TargetRole, string[]> = {
   CSM: ['gainsight', 'totango', 'churnzero', 'hubspot', 'salesforce', 'zendesk', 'intercom', 'mixpanel', 'planhat'],
   Marketing: ['hubspot', 'marketo', 'google analytics', 'semrush', 'salesforce', 'linkedin ads', 'google ads', 'mailchimp', 'pardot', 'ga4'],
   Leadership: ['salesforce', 'hubspot', 'tableau', 'gong', 'workday', 'greenhouse', 'lever', 'clari', 'looker'],
+  RevOps: ['salesforce', 'hubspot', 'marketo', 'clari', 'gong', 'tableau', 'looker', 'outreach', 'salesloft', 'zapier', 'zoominfo', 'people.ai', 'crossbeam'],
 }
 
 // Marketing subtypes — used to infer context from JD and surface more targeted advice

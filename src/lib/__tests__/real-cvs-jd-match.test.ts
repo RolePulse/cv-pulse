@@ -139,6 +139,31 @@ Requirements:
 - Deep knowledge of B2B SaaS revenue models, ARR, forecasting, and executive strategy
 - Board-level communication; comfortable with OKRs, hiring, and scaling
   `,
+  RevOps: `
+Revenue Operations Manager
+
+We are hiring a Revenue Operations Manager to optimise our GTM processes, CRM, and forecasting across Sales, Marketing, and CS.
+
+Responsibilities:
+- Own Salesforce CRM administration, data quality, and pipeline hygiene
+- Build and maintain dashboards and reporting in Tableau and Looker for exec visibility
+- Run weekly forecasting process; support territory planning and quota setting
+- Partner with Sales, Marketing Ops, and CS Ops to align the full revenue operations tech stack
+- Lead workflow automation projects using HubSpot, Outreach, and Salesloft integrations
+- Drive attribution modelling and pipeline management processes
+- Own deal desk operations and compensation planning support
+- Use Clari for forecasting accuracy and pipeline management
+- Identify process optimisation opportunities across the GTM motion
+- Support revenue ops strategy and renewal ops with CRO
+
+Requirements:
+- 3–5 years in revenue operations, sales operations, or GTM ops in a SaaS environment
+- Deep Salesforce admin experience; HubSpot, Clari, Gong, and Outreach familiarity
+- Strong reporting and dashboards skills (Tableau, Looker, or equivalent)
+- Experience with territory planning, quota setting, and compensation planning
+- Comfortable with forecasting, data quality, and pipeline hygiene best practices
+- Proficient with: salesforce, hubspot, clari, gong, tableau, looker, outreach, salesloft
+  `,
 }
 
 // ─── CV files (same list as real-cvs.test.ts) ────────────────────────────────

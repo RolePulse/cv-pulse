@@ -109,7 +109,7 @@ export default function UpgradePage() {
             <div className="mb-5">
               <p className="text-xs font-semibold text-[#FF6B00] uppercase tracking-wide mb-1">Pro</p>
               <p className="text-3xl font-bold text-[#222222]">
-                $9
+                £9
                 <span className="text-base font-normal text-[#999999]"> / month</span>
               </p>
               <p className="text-xs text-[#999999] mt-1">Cancel anytime</p>

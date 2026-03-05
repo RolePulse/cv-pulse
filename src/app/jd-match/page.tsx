@@ -300,7 +300,7 @@ function JDMatchContent() {
               You've used your 2 free JD checks. Upgrade to run unlimited checks.
             </p>
             <Button variant="primary" size="sm" onClick={() => setPaywallOpen(true)}>
-              Upgrade — $9/month
+              Upgrade — £9/month
             </Button>
           </div>
         )}

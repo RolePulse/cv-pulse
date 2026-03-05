@@ -561,7 +561,7 @@ function ScorePanel({
         <div className="border-t border-[#EEEEEE] mb-4" />
 
         {/* Re-score button — hidden on mobile (bottom bar owns it there) */}
-        <div className={hideMobileRescore ? 'hidden lg:block' : ''}>
+        <div className={hideMobileRescore ? 'hidden md:block' : ''}>
           <Button variant="primary" size="md" className="w-full justify-center" onClick={onRescore} disabled={isRescoring}>
             {isDemo ? 'Sign in to score your own CV →' : isRescoring ? (
               <span className="flex items-center gap-2">
@@ -1119,7 +1119,7 @@ function ScorePageContent() {
       )}
 
       {/* ── Mobile tab bar ── */}
-      <div className={`lg:hidden sticky z-20 bg-white border-b border-[#DDDDDD] ${isDemo ? 'top-[52px]' : 'top-0'}`}>
+      <div className={`md:hidden sticky z-20 bg-white border-b border-[#DDDDDD] ${isDemo ? 'top-[52px]' : 'top-0'}`}>
         <div className="max-w-7xl mx-auto px-4 flex">
           <button
             onClick={() => setActiveTab('score')}
@@ -1147,7 +1147,7 @@ function ScorePageContent() {
         )}
 
         {/* ── Mobile: single active tab ── */}
-        <div className="lg:hidden">
+        <div className="md:hidden">
           {activeTab === 'score' ? (
             <ScorePanel {...scorePanelProps} hideMobileRescore />
           ) : (
@@ -1156,7 +1156,7 @@ function ScorePageContent() {
         </div>
 
         {/* ── Desktop: two-panel layout ── */}
-        <div className="hidden lg:flex gap-6 items-start">
+        <div className="hidden md:flex gap-6 items-start">
           <div className="w-80 xl:w-96 flex-shrink-0 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
             <ScorePanel {...scorePanelProps} />
           </div>
@@ -1168,7 +1168,7 @@ function ScorePageContent() {
 
       {/* ── Mobile sticky bottom bar ── */}
       <div
-        className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#DDDDDD] px-4 py-2.5 flex items-center gap-3 z-30"
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#DDDDDD] px-4 py-2.5 flex items-center gap-3 z-30"
         style={{ boxShadow: '0 -2px 12px rgba(0,0,0,0.08)' }}
       >
         <div

@@ -66,7 +66,7 @@ export default function PaywallModal({ isOpen, onClose, action, closeLabel = 'Ma
 
         {/* Price note */}
         <div className="bg-[#FFF7F2] rounded-[6px] border border-[#FFD9C2] px-4 py-3">
-          <p className="text-sm font-semibold text-[#222222]">$9 / month</p>
+          <p className="text-sm font-semibold text-[#222222]">£9 / month</p>
           <p className="text-xs text-[#666666] mt-0.5">Cancel anytime. No commitment.</p>
         </div>
 
@@ -79,7 +79,7 @@ export default function PaywallModal({ isOpen, onClose, action, closeLabel = 'Ma
             className="w-full justify-center"
             onClick={() => { onClose(); router.push('/upgrade') }}
           >
-            Upgrade — $9/month →
+            Upgrade — £9/month →
           </Button>
           <Button
             variant="ghost"

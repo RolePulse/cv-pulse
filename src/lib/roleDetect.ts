@@ -1,9 +1,9 @@
 // CV Pulse — Role Detection
 // Epic 3 | Deterministic keyword-based role inference. No LLM.
 
-export type TargetRole = 'SDR' | 'AE' | 'CSM' | 'Marketing' | 'Leadership'
+export type TargetRole = 'SDR' | 'AE' | 'CSM' | 'Marketing' | 'Leadership' | 'RevOps'
 
-export const ALL_ROLES: TargetRole[] = ['SDR', 'AE', 'CSM', 'Marketing', 'Leadership']
+export const ALL_ROLES: TargetRole[] = ['SDR', 'AE', 'CSM', 'Marketing', 'Leadership', 'RevOps']
 
 export const ROLE_LABELS: Record<TargetRole, string> = {
   SDR: 'SDR / BDR',
@@ -11,6 +11,7 @@ export const ROLE_LABELS: Record<TargetRole, string> = {
   CSM: 'Customer Success',
   Marketing: 'Marketing',
   Leadership: 'Leadership / VP',
+  RevOps: 'RevOps',
 }
 
 export const ROLE_DESCRIPTIONS: Record<TargetRole, string> = {
@@ -19,6 +20,7 @@ export const ROLE_DESCRIPTIONS: Record<TargetRole, string> = {
   CSM: 'Retention, renewals, customer health',
   Marketing: 'Demand gen, content, campaigns',
   Leadership: 'Team building, strategy, revenue org',
+  RevOps: 'CRM, process, revenue operations',
 }
 
 const ROLE_KEYWORDS: Record<TargetRole, string[]> = {
@@ -94,6 +96,24 @@ const ROLE_KEYWORDS: Record<TargetRole, string[]> = {
     'board',
     'chief',
     'c-suite',
+  ],
+  RevOps: [
+    'revenue operations',
+    'revops',
+    'sales operations',
+    'sales ops',
+    'marketing ops',
+    'crm administration',
+    'salesforce admin',
+    'pipeline hygiene',
+    'territory planning',
+    'quota setting',
+    'forecasting',
+    'process optimisation',
+    'process optimization',
+    'data quality',
+    'revenue ops',
+    'gtm operations',
   ],
 }
 

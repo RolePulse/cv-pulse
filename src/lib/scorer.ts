@@ -89,6 +89,14 @@ const ATS_KEYWORDS: Record<TargetRole, string[]> = {
     'team building', 'executive', 'growth', 'market expansion', 'scaling',
     'c-suite',
   ],
+  RevOps: [
+    'revenue operations', 'revops', 'sales operations', 'salesforce', 'crm',
+    'forecasting', 'pipeline management', 'territory planning', 'quota setting',
+    'attribution', 'data quality', 'process optimisation', 'process optimization',
+    'reporting', 'dashboards', 'workflow automation', 'tech stack', 'hubspot',
+    'sales ops', 'marketing ops', 'pipeline hygiene', 'gtm operations',
+    'compensation planning', 'deal desk', 'renewal ops',
+  ],
 }
 
 // Tools commonly associated with each role
@@ -98,6 +106,7 @@ const ROLE_TOOLS: Record<TargetRole, string[]> = {
   CSM: ['gainsight', 'totango', 'churnzero', 'hubspot', 'salesforce', 'zendesk', 'intercom', 'mixpanel', 'planhat'],
   Marketing: ['hubspot', 'marketo', 'google analytics', 'semrush', 'salesforce', 'linkedin ads', 'google ads', 'mailchimp', 'pardot', 'ga4'],
   Leadership: ['salesforce', 'hubspot', 'tableau', 'gong', 'workday', 'greenhouse', 'lever', 'clari', 'looker'],
+  RevOps: ['salesforce', 'hubspot', 'marketo', 'clari', 'gong', 'tableau', 'looker', 'outreach', 'salesloft', 'zapier', 'zoominfo', 'people.ai', 'crossbeam'],
 }
 
 // Role signal keywords — what a recruiter scanning for this role would look for in title/summary
@@ -107,6 +116,7 @@ const ROLE_SIGNALS: Record<TargetRole, string[]> = {
   CSM:        ['customer success', 'csm', 'customer success manager', 'account management', 'retention'],
   Marketing:  ['marketing', 'demand gen', 'growth', 'content', 'seo', 'campaign', 'marketing manager'],
   Leadership: ['vp', 'director', 'head of', 'chief', 'vice president', 'leadership', 'revenue leader'],
+  RevOps: ['revenue operations', 'revops', 'sales operations', 'sales ops', 'revenue ops', 'gtm ops', 'operations manager', 'ops manager'],
 }
 
 // ─── Role-specific example strings for checklist action copy ─────────────────
@@ -118,6 +128,7 @@ const ROLE_TITLE_EXAMPLES: Record<TargetRole, string> = {
   CSM:        'Customer Success Manager | SaaS | Retention',
   Marketing:  'Demand Generation Manager | B2B SaaS | Growth',
   Leadership: 'VP Sales | SaaS | Revenue Growth',
+  RevOps:     'Revenue Operations Manager | CRM | Forecasting',
 }
 
 const ROLE_SUMMARY_EXAMPLES: Record<TargetRole, string> = {
@@ -126,6 +137,7 @@ const ROLE_SUMMARY_EXAMPLES: Record<TargetRole, string> = {
   CSM:        'Customer Success Manager | Retention | SaaS',
   Marketing:  'Marketing Manager | Demand Generation | B2B SaaS',
   Leadership: 'VP Sales | Revenue Growth | SaaS',
+  RevOps:     'Revenue Operations | GTM Strategy | Salesforce',
 }
 
 // ─── Helper: is a bullet quantified? ─────────────────────────────────────────

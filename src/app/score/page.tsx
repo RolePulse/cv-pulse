@@ -228,6 +228,12 @@ function autoResize(el: HTMLTextAreaElement) {
   el.style.height = `${el.scrollHeight}px`
 }
 
+// ── Placeholder detection — true if value contains [bracket content] ──────────
+
+function hasPlaceholder(value: string): boolean {
+  return /\[.+?\]/.test(value)
+}
+
 // ── Editable textarea ─────────────────────────────────────────────────────────
 
 function EditableText({
@@ -245,21 +251,31 @@ function EditableText({
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => { if (ref.current) autoResize(ref.current) }, [value])
+  const isPholder = hasPlaceholder(value)
 
   return (
-    <textarea
-      ref={ref}
-      value={value}
-      placeholder={placeholder}
-      rows={rows}
-      onChange={(e) => { onChange(e.target.value); autoResize(e.target) }}
-      className={[
-        'w-full text-sm text-[#222222] border border-[#EEEEEE] rounded-[4px] px-2 py-1',
-        'hover:border-[#DDDDDD] focus:border-[#FF6B00] focus:outline-none',
-        'resize-none transition-colors bg-[#F9F9F9] focus:bg-white',
-        className,
-      ].join(' ')}
-    />
+    <div className={`relative ${className}`}>
+      <textarea
+        ref={ref}
+        value={value}
+        placeholder={placeholder}
+        rows={rows}
+        onChange={(e) => { onChange(e.target.value); autoResize(e.target) }}
+        className={[
+          'w-full text-sm text-[#222222] border rounded-[4px] px-2 py-1',
+          'hover:border-[#DDDDDD] focus:border-[#FF6B00] focus:outline-none',
+          'resize-none transition-colors focus:bg-white',
+          isPholder
+            ? 'bg-amber-50 border-amber-300 border-l-4 border-l-amber-400 pr-14'
+            : 'bg-[#F9F9F9] border-[#EEEEEE]',
+        ].join(' ')}
+      />
+      {isPholder && (
+        <span className="absolute right-1.5 top-1.5 text-[10px] text-amber-700 font-semibold pointer-events-none select-none bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5 leading-none whitespace-nowrap">
+          fill in ✏️
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -276,6 +292,7 @@ function EditableInput({
   placeholder?: string
   className?: string
 }) {
+  const isPholder = hasPlaceholder(value)
   return (
     <input
       type="text"
@@ -283,9 +300,12 @@ function EditableInput({
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
       className={[
-        'text-sm border border-[#EEEEEE] rounded-[4px] px-2 py-0.5',
+        'text-sm border rounded-[4px] px-2 py-0.5',
         'hover:border-[#DDDDDD] focus:border-[#FF6B00] focus:outline-none',
-        'transition-colors bg-[#F9F9F9] focus:bg-white w-full',
+        'transition-colors focus:bg-white w-full',
+        isPholder
+          ? 'bg-amber-50 border-amber-300 border-l-4 border-l-amber-400 text-amber-900'
+          : 'bg-[#F9F9F9] border-[#EEEEEE]',
         className,
       ].join(' ')}
     />

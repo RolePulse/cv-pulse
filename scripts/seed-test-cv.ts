@@ -9,7 +9,7 @@ const url = env.match(/NEXT_PUBLIC_SUPABASE_URL=(.+)/)![1].trim()
 const key = env.match(/SUPABASE_SERVICE_ROLE_KEY=(.+)/)![1].trim()
 const admin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 
-const USER_ID = '2a717dca-056b-4ca7-9f02-ac3f643c2361'
+const USER_ID = 'a567d2f0-387f-418c-9e85-6ea02a8d5a75'
 const PDF_PATH = process.argv[2] || '/Users/jamesfowles/Downloads/Anthony Branch AE Resume 2025 (2).pdf'
 const TARGET_ROLE = (process.argv[3] || 'AE') as TargetRole
 

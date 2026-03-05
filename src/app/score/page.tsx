@@ -361,6 +361,48 @@ function RoleCard({
   )
 }
 
+// ── Next fix nudge ────────────────────────────────────────────────────────────
+
+function NextFixCard({ items, onFix }: { items: ScoreResult['checklist']; onFix?: () => void }) {
+  const unfixed = items.filter(i => !i.done)
+  if (unfixed.length === 0) return null
+
+  // Critical issues surface first regardless of points, then sort by potentialPoints desc
+  const sorted = [...unfixed].sort((a, b) => {
+    if (a.category === 'critical' && b.category !== 'critical') return -1
+    if (b.category === 'critical' && a.category !== 'critical') return 1
+    return b.potentialPoints - a.potentialPoints
+  })
+
+  const next = sorted[0]
+  const remaining = unfixed.length
+
+  return (
+    <div className="bg-[#FFF7F2] border border-[#FFD4A8] rounded-[8px] p-4 mb-3">
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <p className="text-[10px] font-semibold text-[#FF6B00] uppercase tracking-wide">Best next move</p>
+        <span className="text-[10px] text-[#BBBBBB]">{remaining} fix{remaining === 1 ? '' : 'es'} left</span>
+      </div>
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <p className="text-[13px] font-medium text-[#222222] leading-snug flex-1">{next.action}</p>
+        {next.potentialPoints > 0 && (
+          <span className="text-[10px] font-semibold text-[#FF6B00] bg-white border border-[#FF6B00]/30 rounded-full px-1.5 py-0.5 flex-shrink-0 mt-0.5">
+            +{next.potentialPoints} pts
+          </span>
+        )}
+      </div>
+      {onFix && (
+        <button
+          onClick={onFix}
+          className="text-xs font-semibold text-white bg-[#FF6B00] hover:bg-[#E05A00] rounded-[6px] px-3 py-1.5 transition-colors cursor-pointer"
+        >
+          Fix this in editor →
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ── Quick fixes panel ─────────────────────────────────────────────────────────
 
 function QuickFixesPanel({ fixes, onApply }: { fixes: AvailableFix[]; onApply: (id: AvailableFix['id']) => void }) {
@@ -430,6 +472,7 @@ function ScorePanel({
   hideMobileRescore = false,
   isDemo = false,
   noChangeFlash = false,
+  onSwitchToEdit,
 }: {
   result: ScoreResult
   initialScore: number
@@ -444,6 +487,7 @@ function ScorePanel({
   hideMobileRescore?: boolean
   isDemo?: boolean
   noChangeFlash?: boolean
+  onSwitchToEdit?: () => void
 }) {
   const [keywordsOpen, setKeywordsOpen] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
@@ -601,6 +645,9 @@ function ScorePanel({
           <p className="text-[10px] text-[#BBBBBB] text-center mt-1.5">Saves automatically before re-scoring</p>
         </div>
       </div>
+
+      {/* Next fix nudge */}
+      {!isDemo && <NextFixCard items={checklist} onFix={onSwitchToEdit} />}
 
       {/* Checklist */}
       <div className="bg-white rounded-[8px] border border-[#DDDDDD] overflow-hidden mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -1107,6 +1154,7 @@ function ScorePageContent() {
     availableFixes,
     onApplyFix: handleApplyFix,
     isDemo,
+    onSwitchToEdit: () => setActiveTab('edit'),
   }
 
   const editorPanelProps = {

@@ -46,6 +46,30 @@ Requirements:
 - Strong cold calling ability; not afraid to pick up the phone
 - Data-driven approach to monitoring pipeline generation metrics
   `,
+  SE: `
+Solutions Engineer — Enterprise SaaS
+
+We are looking for a Solutions Engineer to partner with our Enterprise AE team on technical discovery, product demonstrations, and proof of concept evaluations.
+
+Responsibilities:
+- Own technical discovery calls to understand prospect architecture, integration requirements, and security needs
+- Design and deliver compelling product demonstrations tailored to specific use cases
+- Lead proof of concept (POC) scoping, execution, and technical sign-off to accelerate deal cycles
+- Respond to RFP and RFI submissions with accurate technical documentation
+- Build business cases and ROI models to support value selling with economic buyers
+- Act as the technical champion internally and externally during evaluations
+- Partner with Product and Engineering to relay feature requests and competitive intelligence
+- Track pipeline influenced, win rates, and POC-to-close rates in Salesforce
+
+Requirements:
+- 3–5 years as a Solutions Engineer, Sales Engineer, or Presales Consultant in enterprise SaaS
+- Proven ability to run technical discovery and product demonstrations at C-suite level
+- Strong understanding of APIs, integrations, and cloud architecture (AWS, Azure)
+- Experience with proof of concept execution and technical evaluation processes
+- Familiar with MEDDIC and value selling methodologies
+- Proficient with: salesforce, gong, jira, confluence, postman, aws, azure, zoom, loom, consensus
+- Excellent communicator — translates technical complexity for non-technical buyers
+  `,
   AE: `
 Account Executive — Mid-Market & Enterprise
 

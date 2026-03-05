@@ -1,13 +1,15 @@
 // CV Pulse — Role Detection
 // Epic 3 | Deterministic keyword-based role inference. No LLM.
 
-export type TargetRole = 'SDR' | 'AE' | 'CSM' | 'Marketing' | 'Leadership' | 'RevOps'
+export type TargetRole = 'SDR' | 'AE' | 'SE' | 'CSM' | 'Marketing' | 'Leadership' | 'RevOps'
 
-export const ALL_ROLES: TargetRole[] = ['SDR', 'AE', 'CSM', 'Marketing', 'Leadership', 'RevOps']
+// Ordered for the role picker grid: sales stack row 1, post-sales/ops row 2, leadership row 3
+export const ALL_ROLES: TargetRole[] = ['SDR', 'AE', 'SE', 'CSM', 'Marketing', 'RevOps', 'Leadership']
 
 export const ROLE_LABELS: Record<TargetRole, string> = {
   SDR: 'SDR / BDR',
   AE: 'Account Executive',
+  SE: 'Solutions Engineer',
   CSM: 'Customer Success',
   Marketing: 'Marketing',
   Leadership: 'Leadership / VP',
@@ -17,6 +19,7 @@ export const ROLE_LABELS: Record<TargetRole, string> = {
 export const ROLE_DESCRIPTIONS: Record<TargetRole, string> = {
   SDR: 'Pipeline generation, outbound, sequences',
   AE: 'Closing, quota, new business',
+  SE: 'Demos, POCs, technical discovery, value selling',
   CSM: 'Retention, renewals, customer health',
   Marketing: 'Demand gen, content, campaigns',
   Leadership: 'Team building, strategy, revenue org',
@@ -51,6 +54,23 @@ const ROLE_KEYWORDS: Record<TargetRole, string[]> = {
     'negotiation',
     'contract value',
     'net new',
+  ],
+  SE: [
+    'solutions engineer',
+    'sales engineer',
+    'presales',
+    'pre-sales',
+    'proof of concept',
+    'poc',
+    'technical discovery',
+    'value engineer',
+    'solutions consultant',
+    'solution engineering',
+    'technical evaluation',
+    'rfp',
+    'rfi',
+    'sandbox',
+    'technical champion',
   ],
   CSM: [
     'churn',

@@ -68,6 +68,17 @@ const ATS_KEYWORDS: Record<TargetRole, string[]> = {
     'new logo', 'deal cycle', 'win rate', 'revenue', 'b2b',
     'champion', 'proposals', 'territory', 'sales cycle',
   ],
+  SE: [
+    'solutions engineer', 'sales engineer', 'presales', 'pre-sales',
+    'proof of concept', 'poc', 'technical discovery', 'solution design',
+    'rfp', 'rfi', 'demo', 'product demonstration', 'technical evaluation',
+    'value engineering', 'roi', 'business case', 'value selling',
+    'pipeline influenced', 'revenue influenced', 'deals supported',
+    'api', 'integration', 'saas', 'cloud', 'enterprise',
+    'meddic', 'champion', 'technical champion', 'win rate',
+    'solutions consultant', 'value engineer', 'technical sales',
+    'sandbox', 'technical validation', 'poc to close',
+  ],
   CSM: [
     'retention', 'churn', 'nps', 'csat', 'health score', 'onboarding',
     'qbr', 'renewal', 'expansion', 'upsell', 'gainsight', 'adoption',
@@ -103,6 +114,7 @@ const ATS_KEYWORDS: Record<TargetRole, string[]> = {
 const ROLE_TOOLS: Record<TargetRole, string[]> = {
   SDR: ['outreach', 'salesloft', 'hubspot', 'salesforce', 'gong', 'zoominfo', 'apollo', 'groove', 'yesware', 'sales navigator'],
   AE: ['salesforce', 'hubspot', 'gong', 'chorus', 'docusign', 'pandadoc', 'zoom', 'clari', 'outreach'],
+  SE: ['salesforce', 'gong', 'jira', 'confluence', 'postman', 'aws', 'azure', 'zoom', 'loom', 'miro', 'consensus', 'loopio', 'rfpio', 'hubspot', 'figma'],
   CSM: ['gainsight', 'totango', 'churnzero', 'hubspot', 'salesforce', 'zendesk', 'intercom', 'mixpanel', 'planhat'],
   Marketing: ['hubspot', 'marketo', 'google analytics', 'semrush', 'salesforce', 'linkedin ads', 'google ads', 'mailchimp', 'pardot', 'ga4'],
   Leadership: ['salesforce', 'hubspot', 'tableau', 'gong', 'workday', 'greenhouse', 'lever', 'clari', 'looker'],
@@ -113,6 +125,7 @@ const ROLE_TOOLS: Record<TargetRole, string[]> = {
 const ROLE_SIGNALS: Record<TargetRole, string[]> = {
   SDR:        ['sdr', 'bdr', 'sales development', 'business development representative', 'outbound', 'prospecting'],
   AE:         ['account executive', 'ae', 'account manager', 'sales executive', 'closing', 'quota'],
+  SE:         ['solutions engineer', 'sales engineer', 'presales', 'pre-sales', 'solutions consultant', 'value engineer', 'technical sales'],
   CSM:        ['customer success', 'csm', 'customer success manager', 'account management', 'retention'],
   Marketing:  ['marketing', 'demand gen', 'growth', 'content', 'seo', 'campaign', 'marketing manager'],
   Leadership: ['vp', 'director', 'head of', 'chief', 'vice president', 'leadership', 'revenue leader'],
@@ -125,6 +138,7 @@ const ROLE_SIGNALS: Record<TargetRole, string[]> = {
 const ROLE_TITLE_EXAMPLES: Record<TargetRole, string> = {
   SDR:        'SDR | SaaS | Outbound Specialist',
   AE:         'Account Executive | SaaS | EMEA',
+  SE:         'Solutions Engineer | SaaS | Technical Sales',
   CSM:        'Customer Success Manager | SaaS | Retention',
   Marketing:  'Demand Generation Manager | B2B SaaS | Growth',
   Leadership: 'VP Sales | SaaS | Revenue Growth',
@@ -134,6 +148,7 @@ const ROLE_TITLE_EXAMPLES: Record<TargetRole, string> = {
 const ROLE_SUMMARY_EXAMPLES: Record<TargetRole, string> = {
   SDR:        'SDR | Pipeline Generation | Outbound',
   AE:         'Account Executive | New Business | SaaS',
+  SE:         'Solutions Engineer | Technical Discovery | POC',
   CSM:        'Customer Success Manager | Retention | SaaS',
   Marketing:  'Marketing Manager | Demand Generation | B2B SaaS',
   Leadership: 'VP Sales | Revenue Growth | SaaS',

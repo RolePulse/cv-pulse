@@ -33,6 +33,15 @@ const ATS_KEYWORDS: Record<TargetRole, string[]> = {
     'new logo', 'deal cycle', 'win rate', 'revenue', 'b2b',
     'champion', 'proposals', 'territory', 'sales cycle',
   ],
+  SE: [
+    'solutions engineer', 'sales engineer', 'presales', 'pre-sales',
+    'proof of concept', 'poc', 'technical discovery', 'solution design',
+    'rfp', 'rfi', 'demo', 'value engineering', 'roi', 'business case',
+    'api', 'integration', 'cloud', 'enterprise', 'architecture',
+    'meddic', 'champion', 'technical champion', 'win rate',
+    'pipeline influenced', 'deals supported', 'technical evaluation',
+    'solutions consultant', 'value engineer', 'sandbox',
+  ],
   CSM: [
     'retention', 'churn', 'nps', 'csat', 'health score', 'onboarding',
     'qbr', 'renewal', 'expansion', 'upsell', 'gainsight', 'adoption',
@@ -67,6 +76,7 @@ const ATS_KEYWORDS: Record<TargetRole, string[]> = {
 const ROLE_TOOLS: Record<TargetRole, string[]> = {
   SDR: ['outreach', 'salesloft', 'hubspot', 'salesforce', 'gong', 'zoominfo', 'apollo', 'groove', 'yesware', 'sales navigator'],
   AE: ['salesforce', 'hubspot', 'gong', 'chorus', 'docusign', 'pandadoc', 'zoom', 'clari', 'outreach'],
+  SE: ['salesforce', 'gong', 'jira', 'confluence', 'postman', 'aws', 'azure', 'zoom', 'loom', 'consensus', 'loopio', 'rfpio', 'hubspot'],
   CSM: ['gainsight', 'totango', 'churnzero', 'hubspot', 'salesforce', 'zendesk', 'intercom', 'mixpanel', 'planhat'],
   Marketing: ['hubspot', 'marketo', 'google analytics', 'semrush', 'salesforce', 'linkedin ads', 'google ads', 'mailchimp', 'pardot', 'ga4'],
   Leadership: ['salesforce', 'hubspot', 'tableau', 'gong', 'workday', 'greenhouse', 'lever', 'clari', 'looker'],

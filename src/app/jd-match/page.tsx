@@ -104,9 +104,12 @@ function BreakdownSection({
 
 function JDMatchContent() {
   const searchParams = useSearchParams()
-  const cvId = searchParams.get('cv')
+  const cvId    = searchParams.get('cv')
+  const jdParam = searchParams.get('jd')
+  const source  = searchParams.get('source') // e.g. 'rolepulse'
 
   const [jdText, setJdText] = useState('')
+  const [hasPrefill, setHasPrefill] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<MatchResponse | null>(null)
@@ -115,6 +118,27 @@ function JDMatchContent() {
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [resolvedCvId, setResolvedCvId] = useState<string | null>(cvId)
   const [isSignedIn, setIsSignedIn] = useState(false)
+
+  // Pre-fill JD text from URL param (used by RolePulse deep links)
+  useEffect(() => {
+    if (!jdParam) return
+    try {
+      // Support both plain-text (URL-encoded by browser) and base64-encoded payloads
+      let decoded: string
+      try {
+        decoded = decodeURIComponent(escape(atob(jdParam)))
+      } catch {
+        decoded = jdParam // fall back to raw (already decoded by searchParams.get)
+      }
+      if (decoded.trim().length >= 100) {
+        setJdText(decoded.trim())
+        setHasPrefill(true)
+      }
+    } catch {
+      // ignore malformed param
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // If no cvId in URL, fetch the user's latest CV
   useEffect(() => {
@@ -256,6 +280,14 @@ function JDMatchContent() {
           className="bg-white rounded-[8px] border border-[#DDDDDD] p-6 mb-5"
           style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
         >
+          {hasPrefill && (
+            <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-[6px] px-3 py-2 mb-4 text-sm text-[#FF6B00]">
+              <span>✓</span>
+              <span>
+                JD pre-loaded{source === 'rolepulse' ? ' from RolePulse' : ''} — review it, then click <strong>Check match</strong>.
+              </span>
+            </div>
+          )}
           <label className="block text-sm font-medium text-[#222222] mb-2">
             Job description
           </label>

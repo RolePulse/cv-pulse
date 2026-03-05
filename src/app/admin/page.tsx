@@ -37,6 +37,12 @@ export default function AdminPage() {
   const [metricsLoading, setMetricsLoading] = useState(true)
   const [metricsError, setMetricsError] = useState<string | null>(null)
 
+  // Nudge emails state
+  type NudgeStatus = 'idle' | 'sending' | 'success' | 'error'
+  const [nudgeStatus, setNudgeStatus]   = useState<NudgeStatus>('idle')
+  const [nudgeResult, setNudgeResult]   = useState<{ sent: number; skipped: number; failed: number } | null>(null)
+  const [nudgeError,  setNudgeError]    = useState<string | null>(null)
+
   // Fetch metrics on mount
   useEffect(() => {
     async function loadMetrics() {
@@ -97,6 +103,26 @@ export default function AdminPage() {
 
     // Reset file input so the same file can be re-uploaded if needed
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function handleSendNudges() {
+    setNudgeStatus('sending')
+    setNudgeResult(null)
+    setNudgeError(null)
+    try {
+      const res  = await fetch('/api/admin/send-nudge-emails', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setNudgeStatus('error')
+        setNudgeError(data.error ?? 'Failed to send nudge emails.')
+      } else {
+        setNudgeStatus('success')
+        setNudgeResult({ sent: data.sent ?? 0, skipped: data.skipped ?? 0, failed: data.failed ?? 0 })
+      }
+    } catch {
+      setNudgeStatus('error')
+      setNudgeError('Network error — please try again.')
+    }
   }
 
   return (
@@ -171,6 +197,42 @@ tom@example.com`}
           <p className="text-xs text-[#999999] mt-2">
             Uploaded emails are upserted to the allowlist. Existing users with matching emails are upgraded to <code>rolepulse_paid</code> immediately.
           </p>
+        </div>
+
+        {/* Nudge emails */}
+        <div
+          className="bg-white rounded-[8px] border border-[#DDDDDD] p-5 mb-6"
+          style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-[13px] font-semibold text-[#222222] mb-1">Weekly nudge emails</h2>
+              <p className="text-xs text-[#666666]">
+                Sends a personalised email to each user whose latest CV score is below 70 and who
+                hasn&apos;t been nudged in the last 7 days. Runs automatically every Monday at 9am (Vercel Cron).
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={nudgeStatus === 'sending'}
+              onClick={handleSendNudges}
+              className="shrink-0"
+            >
+              {nudgeStatus === 'sending' ? 'Sending…' : 'Send now'}
+            </Button>
+          </div>
+
+          {nudgeStatus === 'success' && nudgeResult && (
+            <div className="mt-3 text-xs text-[#16A34A] font-medium">
+              ✓ {nudgeResult.sent} email{nudgeResult.sent !== 1 ? 's' : ''} sent
+              {nudgeResult.skipped > 0 ? `, ${nudgeResult.skipped} skipped (recently nudged)` : ''}
+              {nudgeResult.failed > 0 ? `, ${nudgeResult.failed} failed` : ''}
+            </div>
+          )}
+          {nudgeStatus === 'error' && nudgeError && (
+            <p className="mt-3 text-xs text-[#DC2626]">{nudgeError}</p>
+          )}
         </div>
 
         {/* Funnel metrics */}

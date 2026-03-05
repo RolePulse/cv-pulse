@@ -45,6 +45,19 @@ export default async function Home() {
   const { data: { user } } = await supabase.auth.getUser()
   const isSignedIn = !!user
 
+  // For signed-in users who already have a CV — send them straight back to their score
+  let existingCvId: string | null = null
+  if (user) {
+    const { data: existingCv } = await supabase
+      .from('cvs')
+      .select('id')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (existingCv) existingCvId = existingCv.id
+  }
+
   return (
     <div className="min-h-screen bg-[#FFF7F2]">
       <Header isSignedIn={isSignedIn} />
@@ -78,17 +91,27 @@ export default async function Home() {
         </div>
 
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link href="/upload">
-            <Button variant="primary" size="lg">
-              Score my CV →
-            </Button>
-          </Link>
-          <Link
-            href="/score?demo=true"
-            className="text-sm font-medium text-[#FF6B00] hover:text-[#E05A00] underline underline-offset-2 transition-colors"
-          >
-            See a demo score first
-          </Link>
+          {existingCvId ? (
+            <Link href={`/score?cvId=${existingCvId}`}>
+              <Button variant="primary" size="lg">
+                View my score →
+              </Button>
+            </Link>
+          ) : (
+            <Link href="/upload">
+              <Button variant="primary" size="lg">
+                Score my CV →
+              </Button>
+            </Link>
+          )}
+          {!existingCvId && (
+            <Link
+              href="/score?demo=true"
+              className="text-sm font-medium text-[#FF6B00] hover:text-[#E05A00] underline underline-offset-2 transition-colors"
+            >
+              See a demo score first
+            </Link>
+          )}
         </div>
         <p className="mt-3 text-xs text-[#BBBBBB]">Free to start · No card required</p>
       </section>

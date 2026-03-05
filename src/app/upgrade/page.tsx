@@ -96,15 +96,9 @@ export default function UpgradePage() {
 
           {/* Pro */}
           <div
-            className="bg-white rounded-[10px] border-2 border-[#FF6B00] p-6 flex flex-col relative"
+            className="bg-white rounded-[10px] border-2 border-[#FF6B00] p-6 flex flex-col"
             style={{ boxShadow: '0 4px 12px rgba(255,107,0,0.12)' }}
           >
-            {/* Badge */}
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <span className="bg-[#FF6B00] text-white text-[10px] font-bold uppercase tracking-wide px-3 py-1 rounded-full">
-                Most popular
-              </span>
-            </div>
 
             <div className="mb-5">
               <p className="text-xs font-semibold text-[#FF6B00] uppercase tracking-wide mb-1">Pro</p>

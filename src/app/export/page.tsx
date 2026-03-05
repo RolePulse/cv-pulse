@@ -32,6 +32,7 @@ function ExportContent() {
   const cvId = searchParams.get('cv')
 
   const [resolvedCvId, setResolvedCvId] = useState<string | null>(cvId)
+  const [resolving, setResolving] = useState(!cvId) // true while we look up the CV from auth
   const [cvData, setCvData] = useState<{ structured: StructuredCV; rawText: string } | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -44,7 +45,7 @@ function ExportContent() {
     async function resolve() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) { setResolving(false); return }
       const { data: cv } = await supabase
         .from('cvs')
         .select('id')
@@ -53,6 +54,7 @@ function ExportContent() {
         .limit(1)
         .maybeSingle()
       if (cv) setResolvedCvId(cv.id)
+      setResolving(false)
     }
     resolve()
   }, [resolvedCvId])
@@ -138,7 +140,7 @@ function ExportContent() {
 
         <h1 className="text-2xl font-bold text-[#222222] mb-2 text-center">Export your CV</h1>
         <p className="text-[#444444] text-center text-sm mb-8">
-          Two clean, ATS-safe templates. Both free in v1.
+          Two clean, ATS-safe templates. Included in all plans.
         </p>
 
         {error && (
@@ -147,7 +149,28 @@ function ExportContent() {
           </div>
         )}
 
+        {/* Empty state — no CV found after resolution */}
+        {!resolving && !resolvedCvId && (
+          <div
+            className="bg-white rounded-[8px] border border-[#DDDDDD] p-10 mb-8 text-center"
+            style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
+          >
+            <p className="text-2xl mb-3">📄</p>
+            <h2 className="text-[15px] font-semibold text-[#222222] mb-2">No CV uploaded yet</h2>
+            <p className="text-sm text-[#666666] mb-5">
+              Upload and score your CV first — then come back here to download your polished PDF.
+            </p>
+            <a
+              href="/upload"
+              className="inline-block bg-[#FF6B00] text-white text-sm font-semibold px-5 py-2.5 rounded-[6px] hover:bg-[#E05A00] transition-colors"
+            >
+              Upload my CV →
+            </a>
+          </div>
+        )}
+
         {/* Template cards */}
+        {(resolving || resolvedCvId) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           {TEMPLATES.map((template) => (
             <div
@@ -199,6 +222,7 @@ function ExportContent() {
             </div>
           ))}
         </div>
+        )}
 
         {/* ATS safety note */}
         <div

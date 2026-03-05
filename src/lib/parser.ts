@@ -336,10 +336,6 @@ export function extractExperience(text: string): ExperienceRole[] {
 
     // Case A: text inline before the date on the same line
     // Guard: must be > 5 chars and not a partial date fragment (e.g. "11/", "Jan", "06/")
-    // eslint-disable-next-line no-console
-    console.log(`[dateL] line="${dateLine.slice(0,70)}" tb="${textBefore.slice(0,30)}" p1="${(lines[dateIdx-1]??'').slice(0,30)}"`)
-    // eslint-disable-next-line no-console
-    if (TITLE_KEYWORD_RE.test(textBefore)) console.log(`[caseA] matched title kw`)
     if (textBefore.length > 5 && !/^\d{1,4}[\/\-]?$/.test(textBefore)) {
       // Detect "Title | Date" vs "Company | Date" format:
       // If prev1 already has a usable non-date/non-bullet/non-location line (a title above the date),
@@ -360,7 +356,18 @@ export function extractExperience(text: string): ExperienceRole[] {
         // company+location lines, not job titles.
         !/\s[-–]\s*(Remote|Hybrid|On-?site|Onsite|In-?person)\s*$/i.test(prevLine)
       )
-      if (endsWithPipe && !prevHasTitle) {
+      // Three-part pipe: "Company | Title | Date" (e.g. Clarisse T — "RepeatMD | Manager, Customer Support | Feb 2024")
+      // Detect by: endsWithPipe, textBefore contains ' | ', first segment is not a title keyword, second is.
+      const pipeParts = textBefore.split(' | ')
+      const threePartPipe =
+        endsWithPipe &&
+        pipeParts.length >= 2 &&
+        !TITLE_KEYWORD_RE.test(pipeParts[0]) &&
+        TITLE_KEYWORD_RE.test(pipeParts.slice(1).join(' | '))
+      if (threePartPipe) {
+        company = pipeParts[0].trim()
+        title = pipeParts.slice(1).join(' | ').trim()
+      } else if (endsWithPipe && !prevHasTitle) {
         // "Title | Date" — nothing useful above: inline text IS the job title.
         title = textBefore
       } else if (endsWithPipe && TITLE_KEYWORD_RE.test(textBefore)) {
@@ -414,9 +421,10 @@ export function extractExperience(text: string): ExperienceRole[] {
       : rawEffective2
 
     if (endsWithPipe) {
-      if (title) {
-        // "Title | Date" — title already set from inline text.
+      if (title && !company) {
+        // "Title | Date" — title already set from inline text, company not yet known.
         // Get company from the nearest usable prev line (skip location/bullet/date/other-date-lines).
+        // (When threePartPipe already set company above, skip this block.)
         // Extended lookback (up to 12 lines) handles "multiple roles under one company header":
         //   AvePoint                          ← company (6+ lines back)
         //   Enterprise AE | Dec 2020 – Aug 2024  ← date line — skip, don't stop
@@ -435,9 +443,10 @@ export function extractExperience(text: string): ExperienceRole[] {
           break
         }
         if (companyLine) company = cleanCompanyLine(companyLine)
-      } else if (company) {
-        // "Company | Date" — company set from inline text.
+      } else if (company && !title) {
+        // "Company | Date" — company set from inline text, title not yet known.
         // Get title from prev1 (the line above, e.g. "Senior SDR").
+        // (When threePartPipe already set both company and title, skip this block.)
         if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocation(prev1) && !looksLikeSeparator(prev1) && !isBulletLine(prev1)) {
           title = prev1
         }
@@ -447,10 +456,14 @@ export function extractExperience(text: string): ExperienceRole[] {
       // First: look for a clean non-location, non-bullet line (simple company name like "GovInvest").
       // Second: if not found, check if prev1 is a combined "Company City, State" line and clean it.
       const strictCompany = [prev1, prev2, prev3].find(
-        l => l && !looksLikeDateRange(l) && !isBulletLine(l) && !looksLikeLocation(l) && !looksLikeSeparator(l)
+        l => l &&
+          /^[A-Z]/.test(l) &&            // company names start uppercase; skip bullet continuations
+          !looksLikeDateRange(l) &&
+          !isBulletLine(l) &&
+          !looksLikeLocation(l) &&
+          !looksLikeSeparator(l) &&
+          !TITLE_KEYWORD_RE.test(l)       // skip another role's title line
       )
-      // eslint-disable-next-line no-console
-      console.log(`[title&&!co] title="${title}" p1="${prev1}" p2="${prev2}" p3="${prev3}" strictCo="${strictCompany}"`)
       if (strictCompany) {
         company = cleanCompanyLine(strictCompany)
       } else if (prev1 && looksLikeLocation(prev1) && prev1.trim().length > 15) {
@@ -548,8 +561,6 @@ export function extractExperience(text: string): ExperienceRole[] {
     // rawEffective2 is non-empty (i.e., the immediate 2–3 line window had a location-like line).
     if (!company && skip2 && rawEffective2.trim()) {
       const recovered = cleanCompanyLine(rawEffective2)
-      // eslint-disable-next-line no-console
-      console.log(`[recovery] rawEff2="${rawEffective2}" → cleaned="${recovered}" looksLikeLoc=${looksLikeLocation(recovered)} titleKw=${TITLE_KEYWORD_RE.test(recovered)}`)
       if (recovered && recovered.length > 1 && !looksLikeLocation(recovered) && !TITLE_KEYWORD_RE.test(recovered)) {
         company = recovered
       }
@@ -571,6 +582,7 @@ export function extractExperience(text: string): ExperienceRole[] {
         if (isBulletLine(ln)) continue
         if (looksLikeSeparator(ln)) continue
         if (looksLikeDateRange(ln)) continue  // previous role's date — keep looking past it
+        if (!/^[A-Z]/.test(ln)) continue  // company names always start uppercase; skip bullet continuations
         if (TITLE_KEYWORD_RE.test(ln) && !/ - /.test(ln)) continue  // another role's title line
         if (/^[A-Z][A-Z\s&/\-]{3,}$/.test(ln)) break  // section header (e.g. EXPERIENCE) → stop
         const candidate = cleanCompanyLine(ln)
@@ -987,9 +999,18 @@ export function parseText(text: string): ParseResult {
   // A tiny stub (e.g. just a LinkedIn URL or heading) means section detection misfired — fall back to full text.
   const expSection = (sections.experience?.length ?? 0) > 100 ? sections.experience! : rawText
 
+  // 2-pass experience extraction: try the detected section first.
+  // If it yields 0 roles (e.g. section label appears at the bottom of the content in column-layout PDFs,
+  // so detectSections returns only a skills list after the label), fall back to the full raw text.
+  // extractExperience only picks up lines containing date ranges, so false positives are rare.
+  let experienceRoles = extractExperience(expSection)
+  if (experienceRoles.length === 0 && expSection !== rawText) {
+    experienceRoles = extractExperience(rawText)
+  }
+
   const structured: StructuredCV = {
     summary: sections.summary || '',
-    experience: extractExperience(expSection),
+    experience: experienceRoles,
     skills: extractSkills(sections.skills || ''),
     education: extractEducation(sections.education || ''),
     certifications: extractSkills(sections.certifications || ''),

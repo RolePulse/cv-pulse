@@ -1211,7 +1211,15 @@ function ScorePageContent() {
     availableFixes,
     onApplyFix: handleApplyFix,
     isDemo,
-    onSwitchToEdit: () => setActiveTab('edit'),
+    onSwitchToEdit: () => {
+      if (window.innerWidth >= 768) {
+        // Desktop: editor panel is always visible — scroll it into view
+        document.getElementById('desktop-editor-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else {
+        // Mobile: switch to the edit tab
+        setActiveTab('edit')
+      }
+    },
   }
 
   const editorPanelProps = {
@@ -1307,7 +1315,7 @@ function ScorePageContent() {
           <div className="w-80 xl:w-96 flex-shrink-0 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
             <ScorePanel {...scorePanelProps} />
           </div>
-          <div className="flex-1 min-w-0">
+          <div id="desktop-editor-panel" className="flex-1 min-w-0">
             <EditorPanel {...editorPanelProps} />
           </div>
         </div>

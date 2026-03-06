@@ -1213,8 +1213,16 @@ function ScorePageContent() {
     isDemo,
     onSwitchToEdit: () => {
       if (window.innerWidth >= 768) {
-        // Desktop: editor panel is always visible — scroll it into view
-        document.getElementById('desktop-editor-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        // Desktop: editor panel is always visible — scroll it into view then focus first input
+        const panel = document.getElementById('desktop-editor-panel')
+        if (panel) {
+          panel.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          // Focus the first editable field after the scroll animation settles
+          setTimeout(() => {
+            const firstInput = panel.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')
+            firstInput?.focus()
+          }, 400)
+        }
       } else {
         // Mobile: switch to the edit tab
         setActiveTab('edit')

@@ -4,9 +4,12 @@
 // Score pipeline:
 //   structured_json + raw_text + targetRole
 //   → critical concerns check (instant fail)
-//   → 4 bucket scores (impact 35 · ats 25 · formatting 20 · clarity 20)
+//   → 3 bucket scores (impact 47 · formatting 27 · clarity 26)
 //   → checklist items (actionable, with done detection)
 //   → ScoreResult
+//
+// Note: ATS/keyword bucket removed from general score (2026-03-06).
+// Keywords are only shown in JD Match, where advice is role-specific and useful.
 
 import type { StructuredCV, ExperienceRole } from '@/types/database'
 import type { TargetRole } from '@/lib/roleDetect'
@@ -22,7 +25,7 @@ export interface BucketResult {
 
 export interface ScorerChecklistItem {
   id: string
-  category: 'critical' | 'impact' | 'ats' | 'formatting' | 'clarity'
+  category: 'critical' | 'impact' | 'formatting' | 'clarity'
   action: string
   whyItMatters: string
   potentialPoints: number
@@ -34,20 +37,12 @@ export interface ScoreResult {
   passFail: boolean             // true = pass (≥70 AND no critical concerns)
   criticalConcerns: string[]    // list of instant-fail reasons
   buckets: {
-    proofOfImpact: BucketResult   // max 35
-    atsKeywords: BucketResult     // max 25
-    formatting: BucketResult      // max 20
-    clarity: BucketResult         // max 20
+    proofOfImpact: BucketResult   // max 47
+    formatting: BucketResult      // max 27
+    clarity: BucketResult         // max 26
   }
   checklist: ScorerChecklistItem[]
   targetRole: TargetRole
-  // Transparent keyword data (shown in UI)
-  keywordData: {
-    role: TargetRole
-    total: number
-    matched: string[]
-    missing: string[]
-  }
 }
 
 // ─── ATS keyword sets per role ────────────────────────────────────────────────
@@ -512,7 +507,7 @@ function scoreATSKeywords(
   structured: StructuredCV,
   rawText: string,
   targetRole: TargetRole,
-): BucketResult & { checklistItems: ScorerChecklistItem[]; keywordData: ScoreResult['keywordData'] } {
+): BucketResult & { checklistItems: ScorerChecklistItem[]; keywordData: { role: TargetRole; total: number; matched: string[]; missing: string[] } } {
   const positives: string[] = []
   const issues: string[] = []
   const checklistItems: ScorerChecklistItem[] = []
@@ -521,7 +516,7 @@ function scoreATSKeywords(
   const { matched, missing } = countKeywords(rawText, keywords)
   const coverage = matched.length / keywords.length
 
-  const keywordData: ScoreResult['keywordData'] = {
+  const keywordData = {
     role: targetRole,
     total: keywords.length,
     matched,
@@ -542,7 +537,7 @@ function scoreATSKeywords(
     issues.push(`Low keyword coverage: only ${matched.length}/${keywords.length} keywords present`)
     checklistItems.push({
       id: 'keyword-coverage-low',
-      category: 'ats',
+      category: 'impact', // dead code — ATS bucket removed 2026-03-06
       action: `Add missing keywords to your CV: ${missing.slice(0, 6).join(', ')}${missing.length > 6 ? '…' : ''}`,
       whyItMatters: 'ATS systems filter CVs before a human sees them. Missing role-specific keywords = automatic rejection in many processes.',
       potentialPoints: 9,
@@ -553,7 +548,7 @@ function scoreATSKeywords(
     issues.push(`Very low keyword coverage: only ${matched.length}/${keywords.length} keywords present`)
     checklistItems.push({
       id: 'keyword-coverage-very-low',
-      category: 'ats',
+      category: 'impact', // dead code — ATS bucket removed 2026-03-06
       action: `Weave these keywords naturally into your experience and skills: ${missing.slice(0, 8).join(', ')}`,
       whyItMatters: 'Your CV does not yet read as a strong match for this role. ATS and recruiters will both filter you out before your experience is considered.',
       potentialPoints: 13,
@@ -574,7 +569,7 @@ function scoreATSKeywords(
     if (!hasExp) {
       checklistItems.push({
         id: 'no-experience-heading',
-        category: 'ats',
+        category: 'impact', // dead code — ATS bucket removed 2026-03-06
         action: 'Use "Experience" or "Work Experience" as your section heading',
         whyItMatters: 'Many ATS parsers look for these exact headings. Custom headings like "Where I\'ve worked" can cause your experience to be missed entirely.',
         potentialPoints: 2,
@@ -584,7 +579,7 @@ function scoreATSKeywords(
     if (!hasSkills) {
       checklistItems.push({
         id: 'no-skills-heading',
-        category: 'ats',
+        category: 'impact', // dead code — ATS bucket removed 2026-03-06
         action: 'Add a "Skills" section with your key tools and competencies',
         whyItMatters: 'A skills section lets ATS extract your capabilities separately from your experience — and gives recruiters a fast reference.',
         potentialPoints: 2,
@@ -605,7 +600,7 @@ function scoreATSKeywords(
     issues.push('No role-relevant tools mentioned (Salesforce, HubSpot, etc.)')
     checklistItems.push({
       id: 'no-tools',
-      category: 'ats',
+      category: 'impact', // dead code — ATS bucket removed 2026-03-06
       action: `Add the tools you use to your Skills section: ${tools.slice(0, 4).join(', ')}`,
       whyItMatters: 'Tool proficiency is often a hard filter. Recruiters search for specific tools — if yours are not listed, you are not found.',
       potentialPoints: 3,
@@ -623,7 +618,7 @@ function scoreATSKeywords(
     issues.push('Most recent job title does not signal the target role to a recruiter')
     checklistItems.push({
       id: 'title-mismatch',
-      category: 'ats',
+      category: 'impact', // dead code — ATS bucket removed 2026-03-06
       action: `Add role-specific keywords to your most recent job title or summary (e.g. "${ROLE_TITLE_EXAMPLES[targetRole]}")`,
       whyItMatters: 'Recruiters scan job titles first. A title that signals the wrong role reduces your callback rate.',
       potentialPoints: 2,
@@ -914,6 +909,27 @@ function scoreClarity(
 
 // ─── Main scoring function ────────────────────────────────────────────────────
 
+// ─── Proportional scaling helpers ────────────────────────────────────────────
+// ATS/keywords bucket (25 pts) removed from general score (2026-03-06).
+// Remaining 75 pts redistributed proportionally to maintain 100-pt total:
+//   Impact:     35/75 × 100 ≈ 47
+//   Formatting: 20/75 × 100 ≈ 27
+//   Clarity:    20/75 × 100 ≈ 26
+const IMPACT_MAX     = 47
+const FORMATTING_MAX = 27
+const CLARITY_MAX    = 26
+
+function scaleScore(raw: number, oldMax: number, newMax: number): number {
+  return Math.round(raw * newMax / oldMax)
+}
+
+function scalePotentialPoints(items: ScorerChecklistItem[], oldMax: number, newMax: number): ScorerChecklistItem[] {
+  return items.map((item) => ({
+    ...item,
+    potentialPoints: Math.round(item.potentialPoints * newMax / oldMax),
+  }))
+}
+
 export function scoreCV(
   structured: StructuredCV,
   rawText: string,
@@ -922,32 +938,38 @@ export function scoreCV(
   // 1. Critical concerns
   const { concerns, checklistItems: criticalItems } = checkCriticalConcerns(structured, rawText)
 
-  // 2. Bucket scores
-  const impact = scoreProofOfImpact(structured)
-  const ats = scoreATSKeywords(structured, rawText, targetRole)
-  const formatting = scoreFormatting(structured, rawText)
-  const clarity = scoreClarity(structured, rawText, targetRole)
+  // 2. Bucket scores (raw, pre-scaling)
+  const rawImpact     = scoreProofOfImpact(structured)
+  const rawFormatting = scoreFormatting(structured, rawText)
+  const rawClarity    = scoreClarity(structured, rawText, targetRole)
 
-  // 3. Overall score — bucket total minus critical concern penalties
-  // Each unresolved critical concern (missing LinkedIn, email, etc.) deducts its
-  // potentialPoints from the score, so fixing issues produces a real score improvement.
-  const rawBucketScore = impact.score + ats.score + formatting.score + clarity.score
+  // 3. Scale bucket scores to new distribution (47/27/26)
+  const impactScore     = scaleScore(rawImpact.score,     35, IMPACT_MAX)
+  const formattingScore = scaleScore(rawFormatting.score, 20, FORMATTING_MAX)
+  const clarityScore    = scaleScore(rawClarity.score,    20, CLARITY_MAX)
+
+  // 4. Scale checklist potentialPoints to match new maxes
+  const impactItems     = scalePotentialPoints(rawImpact.checklistItems,     35, IMPACT_MAX)
+  const formattingItems = scalePotentialPoints(rawFormatting.checklistItems, 20, FORMATTING_MAX)
+  const clarityItems    = scalePotentialPoints(rawClarity.checklistItems,    20, CLARITY_MAX)
+
+  // 5. Overall score — bucket total minus critical concern penalties
+  const rawBucketScore = impactScore + formattingScore + clarityScore
   const criticalPenalty = criticalItems.reduce((sum, item) => sum + item.potentialPoints, 0)
   const overallScore = Math.max(0, rawBucketScore - criticalPenalty)
 
-  // 4. Pass/fail: 70+ AND no critical concerns
+  // 6. Pass/fail: 70+ AND no critical concerns
   const passFail = overallScore >= 70 && concerns.length === 0
 
-  // 5. Merge checklist (critical first, then by potential points desc)
+  // 7. Merge checklist (critical first, then impact / formatting / clarity)
   const allChecklist: ScorerChecklistItem[] = [
     ...criticalItems,
-    ...impact.checklistItems,
-    ...ats.checklistItems,
-    ...formatting.checklistItems,
-    ...clarity.checklistItems,
+    ...impactItems,
+    ...formattingItems,
+    ...clarityItems,
   ]
 
-  // Deduplicate by id (shouldn't happen but safety net)
+  // Deduplicate by id (safety net)
   const seen = new Set<string>()
   const checklist = allChecklist.filter((item) => {
     if (seen.has(item.id)) return false
@@ -960,13 +982,11 @@ export function scoreCV(
     passFail,
     criticalConcerns: concerns,
     buckets: {
-      proofOfImpact: { score: impact.score, maxScore: 35, positives: impact.positives, issues: impact.issues },
-      atsKeywords: { score: ats.score, maxScore: 25, positives: ats.positives, issues: ats.issues },
-      formatting: { score: formatting.score, maxScore: 20, positives: formatting.positives, issues: formatting.issues },
-      clarity: { score: clarity.score, maxScore: 20, positives: clarity.positives, issues: clarity.issues },
+      proofOfImpact: { score: impactScore,     maxScore: IMPACT_MAX,     positives: rawImpact.positives,     issues: rawImpact.issues },
+      formatting:    { score: formattingScore, maxScore: FORMATTING_MAX, positives: rawFormatting.positives, issues: rawFormatting.issues },
+      clarity:       { score: clarityScore,    maxScore: CLARITY_MAX,    positives: rawClarity.positives,    issues: rawClarity.issues },
     },
     checklist,
     targetRole,
-    keywordData: ats.keywordData,
   }
 }

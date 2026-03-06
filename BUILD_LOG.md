@@ -324,3 +324,36 @@ Re-parsed 5 affected CVs via `parseText(raw_text)` and updated `structured_json`
 - 809/809 tests passing (+2 new tests)
 
 ### ALL 11 PRE-LAUNCH ITEMS COMPLETE ✅
+
+---
+
+## Bug Fix — Critical concerns not affecting score (2026-03-06 13:19 GMT)
+
+**Commit:** 41bb005
+
+### Problem
+The editor was functionally broken for a large class of fixes. Adding LinkedIn to AJ Gilosa's CV (score: 66) and re-scoring returned the same score of 66 — which James correctly identified as impossible.
+
+**Root cause:** Critical concerns (missing LinkedIn, missing email, missing dates, employment gap) had `potentialPoints: 0` and only affected the `passFail` flag, never `overallScore`. `overallScore` was purely the sum of 4 bucket scores. Editing LinkedIn in the editor genuinely could not move the number.
+
+### Fix
+Applied score penalties for each critical concern. Each concern now deducts from `overallScore`:
+- `missing-linkedin`: **-5 pts**
+- `missing-email`: **-8 pts**
+- `missing-dates`: **-3 pts per role with missing dates, capped at -9**
+- `employment-gap`: **-3 pts**
+
+Formula: `overallScore = Math.max(0, rawBucketScore - criticalPenalty)`
+
+`potentialPoints` on each checklist item updated to match the penalty, so the UI correctly shows "+5 pts" next to the LinkedIn item.
+
+### File changed
+- `src/lib/scorer.ts` — penalty constants added; `checkCriticalConcerns` `potentialPoints` updated; `scoreCV` applies penalty sum to raw bucket total
+
+### Test results
+- 851/851 tests passing
+- Dedicated test confirms: without LinkedIn = N, with LinkedIn = N+5 (exact delta verified)
+
+### Notes
+- Existing CVs in DB will show a lower score on next re-score if they have critical concerns — this is correct behaviour, not a regression
+- Score improvements from fixing LinkedIn/email are now real and visible

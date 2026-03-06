@@ -24,16 +24,14 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const BUCKET_CONFIG = [
-  { key: 'proofOfImpact' as const, label: 'Proof of impact',     max: 35 },
-  { key: 'atsKeywords'   as const, label: 'ATS & keywords',      max: 25 },
-  { key: 'formatting'    as const, label: 'Formatting',           max: 20 },
-  { key: 'clarity'       as const, label: 'Clarity & structure',  max: 20 },
+  { key: 'proofOfImpact' as const, label: 'Proof of impact',    max: 47 },
+  { key: 'formatting'    as const, label: 'Formatting',          max: 27 },
+  { key: 'clarity'       as const, label: 'Clarity & structure', max: 26 },
 ]
 
 const CATEGORY_LABELS: Record<string, string> = {
   critical:   'Critical concerns',
   impact:     'Proof of impact',
-  ats:        'ATS & keywords',
   formatting: 'Formatting',
   clarity:    'Clarity & structure',
 }
@@ -560,14 +558,14 @@ function ScorePanel({
   noChangeFlash?: boolean
   onSwitchToEdit?: () => void
 }) {
-  const [keywordsOpen, setKeywordsOpen] = useState(false)
+  // keywordsOpen removed — keywords moved to JD Match only (2026-03-06)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [shareLoading, setShareLoading] = useState(false)
   const [shareError, setShareError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
 
-  const { overallScore, passFail, criticalConcerns, buckets, checklist, targetRole, keywordData } = result
+  const { overallScore, passFail, criticalConcerns, buckets, checklist, targetRole } = result
 
   const improved = initialScore !== overallScore
 
@@ -735,63 +733,26 @@ function ScorePanel({
         ))}
       </div>
 
-      {/* Keywords (collapsible) */}
-      {keywordData && (
-        <div className="bg-white rounded-[8px] border border-[#DDDDDD] overflow-hidden mb-3" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <button onClick={() => setKeywordsOpen((v) => !v)} className="w-full px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-[#FAFAFA] transition-colors">
-            <span className="text-[13px] font-semibold text-[#222222]">Keywords</span>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-[#999999]">{keywordData.matched.length}/{keywordData.total}</span>
-              <span className="text-[#BBBBBB] text-[10px]">{keywordsOpen ? '▲' : '▼'}</span>
+      {/* JD Match CTA — replaces the old keywords section (2026-03-06) */}
+      {/* Keywords now only appear in JD Match, where advice is role-specific */}
+      {!isDemo && cvId && (
+        <Link
+          href={`/jd-match?cv=${cvId}`}
+          onClick={() => track('jd_match_clicked', { cv_id: cvId, score: result?.overallScore })}
+          className="block bg-[#FFFAF7] rounded-[8px] border border-[#FFD4B3] p-4 mb-3 hover:border-[#FF6B00] hover:bg-[#FFF0E6] transition-all group"
+          style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[13px] font-semibold text-[#222222] mb-1">Have a specific role in mind?</p>
+              <p className="text-[11px] text-[#888888] leading-relaxed">Paste the job description — get exact keyword gaps, a match score, and advice that&apos;s specific to <em>this</em> role.</p>
             </div>
-          </button>
-          {keywordsOpen && (
-            <div className="px-4 pb-4">
-              {keywordData.matched.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-[10px] font-semibold text-[#16A34A] uppercase tracking-wide mb-1.5">Present</p>
-                  <div className="flex flex-wrap gap-1">
-                    {keywordData.matched.map((kw) => (
-                      <span key={kw} className="text-[11px] bg-green-50 text-[#16A34A] border border-green-200 rounded-full px-2 py-0.5">{kw}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {keywordData.missing.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-semibold text-[#DC2626] uppercase tracking-wide mb-1.5">Missing</p>
-                  <div className="flex flex-wrap gap-1">
-                    {keywordData.missing.slice(0, 12).map((kw) => (
-                      <span key={kw} className="text-[11px] bg-[#F8F8F8] text-[#888888] border border-[#E0E0E0] rounded-full px-2 py-0.5">{kw}</span>
-                    ))}
-                    {keywordData.missing.length > 12 && (
-                      <span className="text-[11px] text-[#BBBBBB] self-center">+{keywordData.missing.length - 12} more</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* JD Match CTA */}
-      <Link
-        href={`/jd-match?cv=${cvId}`}
-        onClick={() => track('jd_match_clicked', { cv_id: cvId, score: result?.overallScore })}
-        className="block bg-[#FFFAF7] rounded-[8px] border border-[#FFD4B3] p-4 mb-3 hover:border-[#FF6B00] hover:bg-[#FFF0E6] transition-all group"
-        style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[13px] font-semibold text-[#222222] mb-0.5">Have a specific job in mind?</p>
-            <p className="text-[11px] text-[#888888] leading-relaxed">Paste the JD — see exactly where you match and what&apos;s missing.</p>
+            <span className="text-[#FF6B00] text-sm font-semibold whitespace-nowrap flex-shrink-0 group-hover:translate-x-0.5 transition-transform mt-0.5">
+              Check fit →
+            </span>
           </div>
-          <span className="text-[#FF6B00] text-sm font-semibold whitespace-nowrap flex-shrink-0 group-hover:translate-x-0.5 transition-transform">
-            Check fit →
-          </span>
-        </div>
-      </Link>
+        </Link>
+      )}
 
       {/* Share (collapsible) */}
       <div className="bg-white rounded-[8px] border border-[#DDDDDD] overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>

@@ -51,10 +51,10 @@ export interface EducationEntry {
 }
 
 export interface BucketScores {
-  proof_of_impact: number   // max 35
-  ats_keywords: number      // max 25
-  formatting: number        // max 20
-  clarity: number           // max 20
+  proof_of_impact: number   // max 47 (redistributed from old 35; ats_keywords removed 2026-03-06)
+  ats_keywords: number      // always 0 for new scores; kept for DB backwards compat
+  formatting: number        // max 27 (redistributed from old 20)
+  clarity: number           // max 26 (redistributed from old 20)
 }
 
 export interface Penalty {

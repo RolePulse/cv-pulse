@@ -13,7 +13,7 @@ const features = [
     ),
     title: 'Recruiter-grade score',
     description:
-      'Get scored across four key buckets: proof of impact, ATS keywords, formatting, and clarity. Know exactly where you stand.',
+      'Get scored across three key buckets: proof of impact, formatting, and clarity. Know exactly where you stand.',
   },
   {
     icon: (
@@ -166,10 +166,9 @@ export default async function Home() {
                 {/* Buckets */}
                 <div className="mt-3 space-y-2">
                   {[
-                    { label: 'Proof of impact', score: 28, max: 35, color: '#FF6B00' },
-                    { label: 'ATS & keywords', score: 21, max: 25, color: '#16A34A' },
-                    { label: 'Formatting', score: 20, max: 20, color: '#16A34A' },
-                    { label: 'Clarity & structure', score: 17, max: 20, color: '#16A34A' },
+                    { label: 'Proof of impact', score: 35, max: 47, color: '#FF6B00' },
+                    { label: 'Formatting',       score: 25, max: 27, color: '#16A34A' },
+                    { label: 'Clarity & structure', score: 18, max: 26, color: '#FF6B00' },
                   ].map(({ label, score, max, color }) => (
                     <div key={label}>
                       <div className="flex justify-between text-[9px] text-[#666666] mb-0.5">
@@ -188,13 +187,12 @@ export default async function Home() {
               <div className="bg-white rounded-[8px] border border-[#DDDDDD] overflow-hidden">
                 <div className="px-3 py-2 border-b border-[#EEEEEE] flex justify-between items-center">
                   <span className="text-[10px] font-semibold text-[#222222]">Checklist</span>
-                  <span className="text-[9px] text-[#888888]">3/5</span>
+                  <span className="text-[9px] text-[#888888]">2/4</span>
                 </div>
                 <div className="px-3 py-2 space-y-1.5">
                   {[
                     { text: 'Add measurable results to bullets', done: true },
                     { text: 'Professional summary present', done: true },
-                    { text: 'ATS-friendly keywords included', done: true },
                     { text: 'Add LinkedIn profile URL', done: false },
                     { text: 'Address employment gap', done: false },
                   ].map((item, i) => (

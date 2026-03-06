@@ -94,7 +94,7 @@ export async function POST(
   // ── Save to scores table ──────────────────────────────────────────────────
   const bucketScores = {
     proof_of_impact: result.buckets.proofOfImpact.score,
-    ats_keywords: result.buckets.atsKeywords.score,
+    ats_keywords: 0, // Removed from general score (2026-03-06) — keywords only in JD Match
     formatting: result.buckets.formatting.score,
     clarity: result.buckets.clarity.score,
   }

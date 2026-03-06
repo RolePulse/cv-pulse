@@ -85,7 +85,7 @@ describe('Score determinism', () => {
     const r1 = scoreCV(BASE_CV, raw, 'SDR')
     const r2 = scoreCV(BASE_CV, raw, 'SDR')
     expect(r1.buckets.proofOfImpact.score).toBe(r2.buckets.proofOfImpact.score)
-    expect(r1.buckets.atsKeywords.score).toBe(r2.buckets.atsKeywords.score)
+    // atsKeywords bucket removed (2026-03-06) — keywords now only in JD Match
     expect(r1.buckets.formatting.score).toBe(r2.buckets.formatting.score)
     expect(r1.buckets.clarity.score).toBe(r2.buckets.clarity.score)
   })
@@ -139,7 +139,11 @@ describe('Score improvement after edits', () => {
     expect(after.overallScore).toBeGreaterThan(before.overallScore)
   })
 
-  it('adding relevant skills increases ATS keyword score', () => {
+  it('ATS keywords bucket removed — general score is not affected by skills keywords', () => {
+    // As of 2026-03-06, keywords are no longer scored in the general score.
+    // Keyword advice is only shown in JD Match, where it is role-specific and useful.
+    // This test documents the intentional behaviour: adding skills keywords does not
+    // change the general score (only the three remaining buckets drive the score).
     const beforeCV: StructuredCV = { ...BASE_CV, skills: [] }
     const afterCV: StructuredCV = {
       ...BASE_CV,
@@ -149,7 +153,10 @@ describe('Score improvement after edits', () => {
     const before = scoreCV(beforeCV, structuredToRawText(beforeCV), 'SDR')
     const after = scoreCV(afterCV, structuredToRawText(afterCV), 'SDR')
 
-    expect(after.buckets.atsKeywords.score).toBeGreaterThan(before.buckets.atsKeywords.score)
+    expect(after.buckets).not.toHaveProperty('atsKeywords')
+    expect(after.buckets).toHaveProperty('proofOfImpact')
+    expect(after.buckets).toHaveProperty('formatting')
+    expect(after.buckets).toHaveProperty('clarity')
   })
 
   it('adding a summary improves clarity score', () => {

@@ -79,13 +79,13 @@ Education
 University of Leeds — BSc Business Management, 2:1 · 2018`
 
 export const DEMO_SCORE: ScoreResult = {
-  overallScore: 62,
+  overallScore: 64,   // 26 + 27 + 16 = 69 raw, minus 5 (missing LinkedIn penalty)
   passFail: false,
   criticalConcerns: ['Add your LinkedIn profile URL (linkedin.com/in/yourname)'],
   buckets: {
     proofOfImpact: {
-      score: 19,
-      maxScore: 35,
+      score: 26,      // scaled from 19/35 → 26/47
+      maxScore: 47,
       positives: ['Quantified SDR pipeline ($2.1M)', 'Specific team ranking mentioned'],
       issues: [
         'No quota attainment % or $ARR closed on AE role',
@@ -93,24 +93,15 @@ export const DEMO_SCORE: ScoreResult = {
         'BDR role missing revenue or pipe contribution',
       ],
     },
-    atsKeywords: {
-      score: 11,
-      maxScore: 25,
-      positives: ['Includes: pipeline, outbound, prospecting, new business, quota, cold email'],
-      issues: [
-        'Missing: Salesforce/SFDC, MEDDIC, Gong, Outreach, territory management, CRM',
-        'No skills section — limits ATS keyword matching',
-      ],
-    },
     formatting: {
-      score: 20,
-      maxScore: 20,
+      score: 27,      // scaled from 20/20 → 27/27 (perfect)
+      maxScore: 27,
       positives: ['Clean single-column layout', 'Consistent date formatting', 'Bullet points throughout'],
       issues: [],
     },
     clarity: {
-      score: 12,
-      maxScore: 20,
+      score: 16,      // scaled from 12/20 → 16/26
+      maxScore: 26,
       positives: ['Clear role progression (BDR → SDR → AE)', 'Education section present'],
       issues: ['No professional summary — fails the 6-second recruiter scan', '2 bullets exceed 2 lines'],
     },
@@ -121,7 +112,7 @@ export const DEMO_SCORE: ScoreResult = {
       category: 'critical',
       action: 'Add your LinkedIn profile URL (linkedin.com/in/yourname)',
       whyItMatters: 'Recruiters verify candidates on LinkedIn before responding. A missing URL is an instant red flag.',
-      potentialPoints: 0,
+      potentialPoints: 5,
       done: false,
     },
     {
@@ -129,7 +120,7 @@ export const DEMO_SCORE: ScoreResult = {
       category: 'impact',
       action: 'Add quota attainment % or $ARR closed to your TechCorp AE role',
       whyItMatters: 'AEs are hired on their numbers. "Exceeded quota" without a figure means nothing to a recruiter or ATS.',
-      potentialPoints: 8,
+      potentialPoints: 11,
       done: false,
     },
     {
@@ -137,7 +128,7 @@ export const DEMO_SCORE: ScoreResult = {
       category: 'impact',
       action: 'Quantify the Fortune 500 deal — add the ACV or total contract value',
       whyItMatters: 'Deal size signals deal complexity and which market segment you can sell into.',
-      potentialPoints: 5,
+      potentialPoints: 7,
       done: false,
     },
     {
@@ -149,27 +140,11 @@ export const DEMO_SCORE: ScoreResult = {
       done: true,
     },
     {
-      id: 'demo-keywords',
-      category: 'ats',
-      action: 'Add missing AE keywords: Salesforce (SFDC), MEDDIC, Gong, Outreach, territory management',
-      whyItMatters: 'ATS systems filter on exact matches. These are standard requirements in AE job descriptions.',
-      potentialPoints: 10,
-      done: false,
-    },
-    {
-      id: 'demo-skills',
-      category: 'ats',
-      action: 'Add a skills section listing your tools and methodologies',
-      whyItMatters: 'Skills sections are parsed by ATS systems and dramatically improve keyword matching.',
-      potentialPoints: 4,
-      done: false,
-    },
-    {
       id: 'demo-summary',
       category: 'clarity',
       action: 'Add a 2–3 sentence professional summary targeting Account Executive roles',
       whyItMatters: 'A strong summary anchors your profile and is the first thing a recruiter reads. Without it you lose the 6-second scan.',
-      potentialPoints: 5,
+      potentialPoints: 7,
       done: false,
     },
     {
@@ -182,10 +157,4 @@ export const DEMO_SCORE: ScoreResult = {
     },
   ],
   targetRole: 'AE',
-  keywordData: {
-    role: 'AE',
-    total: 25,
-    matched: ['pipeline', 'outbound', 'prospecting', 'new business', 'quota', 'accounts', 'cold email', 'discovery', 'HubSpot'],
-    missing: ['Salesforce', 'SFDC', 'MEDDIC', 'Gong', 'Outreach', 'CRM', 'territory', 'enterprise', 'SaaS', 'ARR', 'ACV', 'Challenger', 'SPIN', 'Hubspot', 'Clari', 'ZoomInfo'],
-  },
 }

@@ -419,7 +419,7 @@ function CriticalBannersBlock({ concerns }: { concerns: string[] }) {
 
 // ── Next fix nudge ────────────────────────────────────────────────────────────
 
-function NextFixCard({ items, onFix }: { items: ScoreResult['checklist']; onFix?: () => void }) {
+function NextFixCard({ items, onFix }: { items: ScoreResult['checklist']; onFix?: (itemId: string) => void }) {
   const unfixed = items.filter(i => !i.done)
   if (unfixed.length === 0) return null
 
@@ -449,7 +449,7 @@ function NextFixCard({ items, onFix }: { items: ScoreResult['checklist']; onFix?
       </div>
       {onFix && (
         <button
-          onClick={onFix}
+          onClick={() => onFix(next.id)}
           className="text-xs font-semibold text-white bg-[#FF6B00] hover:bg-[#E05A00] rounded-[6px] px-3 py-1.5 transition-colors cursor-pointer"
         >
           Fix this in editor →
@@ -556,7 +556,7 @@ function ScorePanel({
   hideMobileRescore?: boolean
   isDemo?: boolean
   noChangeFlash?: boolean
-  onSwitchToEdit?: () => void
+  onSwitchToEdit?: (itemId: string) => void
 }) {
   // keywordsOpen removed — keywords moved to JD Match only (2026-03-06)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
@@ -844,13 +844,13 @@ function EditorPanel({
       {placeholders > 0 && <PlaceholderReminder count={placeholders} />}
 
       {/* Contact details */}
-      <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+      <div id="editor-contact" className="bg-white rounded-[8px] border border-[#DDDDDD] p-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
         <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide mb-3">Contact</h2>
         <div className="grid grid-cols-1 gap-2">
           <input type="text" value={cv.name ?? ''} onChange={e => onNameChange(e.target.value)} placeholder="Full name" className="w-full text-[13px] text-[#222222] bg-transparent border border-[#DDDDDD] rounded-[6px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 placeholder:text-[#BBBBBB]" />
           <div className="grid grid-cols-2 gap-2">
-            <input type="email" value={cv.email ?? ''} onChange={e => onEmailChange(e.target.value)} placeholder="Email address" className="w-full text-[13px] text-[#222222] bg-transparent border border-[#DDDDDD] rounded-[6px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 placeholder:text-[#BBBBBB]" />
-            <input type="tel" value={cv.phone ?? ''} onChange={e => onPhoneChange(e.target.value)} placeholder="Phone number" className="w-full text-[13px] text-[#222222] bg-transparent border border-[#DDDDDD] rounded-[6px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 placeholder:text-[#BBBBBB]" />
+            <input id="editor-email" type="email" value={cv.email ?? ''} onChange={e => onEmailChange(e.target.value)} placeholder="Email address" className="w-full text-[13px] text-[#222222] bg-transparent border border-[#DDDDDD] rounded-[6px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 placeholder:text-[#BBBBBB]" />
+            <input id="editor-phone" type="tel" value={cv.phone ?? ''} onChange={e => onPhoneChange(e.target.value)} placeholder="Phone number" className="w-full text-[13px] text-[#222222] bg-transparent border border-[#DDDDDD] rounded-[6px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 placeholder:text-[#BBBBBB]" />
           </div>
           <input type="text" value={cv.location ?? ''} onChange={e => onLocationChange(e.target.value)} placeholder="Location — e.g. London, UK" className="w-full text-[13px] text-[#222222] bg-transparent border border-[#DDDDDD] rounded-[6px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 placeholder:text-[#BBBBBB]" />
         </div>
@@ -1265,22 +1265,41 @@ function ScorePageContent() {
     onApplyFix: handleApplyFix,
     fixNoChangeFeedback,
     isDemo,
-    onSwitchToEdit: () => {
-      track('fix_in_editor_clicked', { cv_id: cvId, score: result?.overallScore })
-      if (window.innerWidth >= 768) {
-        // Desktop: editor panel is always visible — scroll it into view then focus first input
-        const panel = document.getElementById('desktop-editor-panel')
-        if (panel) {
-          panel.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          // Focus the first editable field after the scroll animation settles
+    onSwitchToEdit: (itemId: string) => {
+      track('fix_in_editor_clicked', { cv_id: cvId, score: result?.overallScore, item_id: itemId })
+
+      // Map checklist item IDs to specific editor element IDs
+      const focusMap: Record<string, string> = {
+        'missing-email':    'editor-email',
+        'missing-phone':    'editor-phone',
+        'missing-linkedin': 'linkedin-input',
+        'missing-dates':    'editor-contact',  // nearest useful anchor — dates are in each role
+        'employment-gap':   'desktop-editor-panel',
+      }
+      const targetId = focusMap[itemId] ?? 'desktop-editor-panel'
+
+      const scrollAndFocus = () => {
+        const el = document.getElementById(targetId)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
           setTimeout(() => {
-            const firstInput = panel.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')
-            firstInput?.focus()
-          }, 400)
+            // If el is a focusable input, focus it directly; otherwise focus its first input
+            if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+              el.focus()
+            } else {
+              el.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')?.focus()
+            }
+          }, 350)
         }
+      }
+
+      if (window.innerWidth >= 768) {
+        // Desktop: editor panel is always visible — scroll to the specific field
+        scrollAndFocus()
       } else {
-        // Mobile: switch to the edit tab
+        // Mobile: switch to the edit tab first, then scroll after re-render
         setActiveTab('edit')
+        setTimeout(scrollAndFocus, 150)
       }
     },
   }

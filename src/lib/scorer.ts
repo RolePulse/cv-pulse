@@ -286,6 +286,7 @@ function checkCriticalConcerns(
   // Each critical concern subtracts from the overall score so that fixing it
   // produces a real score improvement. potentialPoints = the penalty applied.
   const PENALTY_EMAIL    = 8   // instant disqualification without contact details
+  const PENALTY_PHONE    = 3   // easy to miss, but recruiters need a way to call
   const PENALTY_LINKEDIN = 5   // GTM recruiters always check LinkedIn first
   const PENALTY_DATES    = 3   // per role missing dates, capped below
   const PENALTY_GAP      = 3   // unexplained 6+ month gap
@@ -304,7 +305,26 @@ function checkCriticalConcerns(
     })
   }
 
-  // 2. LinkedIn — use structured.linkedin (parsed by the parser) as primary source.
+  // 2. Phone number — check structured first (editor-saved), then scan header area of rawText.
+  // Require ≥9 digits to avoid false-positives from financial figures (e.g. "102.9% attainment").
+  const phoneHeaderText = rawText.split('\n').slice(0, 20).join('\n')
+  const phoneMatch = phoneHeaderText.match(/(?:\+?[\d][\d\s\-\.\(\)]{5,}\d)/)
+  const hasPhone =
+    !!structured.phone ||
+    (phoneMatch !== null && phoneMatch[0].replace(/\D/g, '').length >= 9)
+  if (!hasPhone) {
+    concerns.push('No phone number found')
+    checklistItems.push({
+      id: 'missing-phone',
+      category: 'critical',
+      action: 'Add your phone number in the editor (CV editor → Phone field)',
+      whyItMatters: "Many recruiters call before emailing. A missing number means they'll move on to the next candidate rather than hunt for your contact details.",
+      potentialPoints: PENALTY_PHONE,
+      done: false,
+    })
+  }
+
+  // 3. LinkedIn — use structured.linkedin (parsed by the parser) as primary source.
   // Fall back to rawText scan for CVs uploaded before the linkedin field was added.
   const headerText = rawText.split('\n').slice(0, 20).join('\n').toLowerCase()
   const hasLinkedIn =
@@ -324,7 +344,7 @@ function checkCriticalConcerns(
     })
   }
 
-  // 3. Missing/incomplete experience dates
+  // 4. Missing/incomplete experience dates
   const rolesWithNoDates = structured.experience.filter(
     (r) => !parseDateToYM(r.start)
   )
@@ -342,7 +362,7 @@ function checkCriticalConcerns(
     })
   }
 
-  // 4. Unexplained gaps > 6 months
+  // 5. Unexplained gaps > 6 months
   // Sort experience by start date descending (most recent first)
   const datedRoles = structured.experience
     .filter((r) => parseDateToYM(r.start))

@@ -670,17 +670,55 @@ export function extractExperience(text: string): ExperienceRole[] {
 
 // ─── Skills extraction ────────────────────────────────────────────────────────
 
+// Headings that mark the end of a skills block when encountered as a standalone line.
+// These appear in two-column PDFs where Key Achievements / Awards / contact info
+// gets concatenated directly after the skills list in the linearised raw text.
+const SKILLS_STOP_PATTERN = /^(key\s+achievements?|achievements?|awards?|accomplishments?|honours?|honors?|references?|certifications?|additional\s+information|contact|personal\s+details?)\s*:?\s*$/i
+
 export function extractSkills(text: string): string[] {
   if (!text.trim()) return []
-  return text
-    .split(/[,|•\n·\/]/)
+
+  // ── A: Truncate at subsection headings ───────────────────────────────────
+  // Walk line-by-line; stop when we hit a standalone heading (e.g. "KEY ACHIEVEMENTS:").
+  // This prevents column-layout CVs from bleeding Key Achievements / contact info into skills.
+  const inputLines = text.split('\n')
+  const truncatedLines: string[] = []
+  for (const line of inputLines) {
+    const trimmed = line.trim()
+    if (trimmed && trimmed.length < 60 && SKILLS_STOP_PATTERN.test(trimmed)) break
+    truncatedLines.push(line)
+  }
+  const truncated = truncatedLines.join('\n')
+
+  // ── A2: Token-level stop — catches headings embedded inline (comma-separated) ──
+  const rawTokens = truncated.split(/[,|•\n·\/]/)
+  const tokens: string[] = []
+  for (const token of rawTokens) {
+    const t = token.trim()
+    if (t && t.length < 60 && SKILLS_STOP_PATTERN.test(t)) break
+    tokens.push(token)
+  }
+
+  return tokens
     .map(s => {
       let skill = s.replace(new RegExp(`^[\\-\\*\\s${BULLET_CHARS}]+`), '').trim()
       // Strip category label prefixes like "Languages: ", "Tools: ", "Methods: "
       skill = skill.replace(/^[A-Za-z][A-Za-z\s&\/]{1,20}:\s+/, '')
       return skill.trim()
     })
-    .filter(s => s.length >= 2 && s.length <= 60 && !/^\d+$/.test(s))
+    // ── B: Safety-net filters ─────────────────────────────────────────────
+    .filter(s => {
+      if (s.length < 2 || s.length > 60) return false
+      if (/^\d+$/.test(s)) return false                         // pure number
+      if (s.includes('@')) return false                         // email address
+      if (/\d{7,}/.test(s.replace(/\D/g, ''))) return false    // phone number (7+ digits)
+      if (/\b\d{3}[-.\s]\d{3,4}[-.\s]\d{4}\b/.test(s)) return false  // xxx-xxx-xxxx pattern
+      // Sentence fragment: 5+ space-separated words = not a skill name
+      if (/\s/.test(s) && s.split(/\s+/).length >= 5) return false
+      // Standalone section heading (ALL CAPS ending colon, like "KEY ACHIEVEMENTS:", "DISH NETWORK:")
+      if (/^[A-Z][A-Z\s&:]+:$/.test(s)) return false
+      return true
+    })
     .slice(0, 60)
 }
 

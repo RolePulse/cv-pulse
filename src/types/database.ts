@@ -24,6 +24,7 @@ export interface CV {
 }
 
 export interface StructuredCV {
+  linkedin?: string          // e.g. "linkedin.com/in/jamesfowles" or full URL
   summary: string
   experience: ExperienceRole[]
   skills: string[]

@@ -817,6 +817,7 @@ function ScorePanel({
 function EditorPanel({
   cv,
   saveStatus,
+  onLinkedInChange,
   onSummaryChange,
   onRoleChange,
   onSkillsChange,
@@ -828,6 +829,7 @@ function EditorPanel({
 }: {
   cv: StructuredCV
   saveStatus: SaveStatus
+  onLinkedInChange: (v: string) => void
   onSummaryChange: (v: string) => void
   onRoleChange: (i: number, r: ExperienceRole) => void
   onSkillsChange: (skills: string[]) => void
@@ -858,6 +860,27 @@ function EditorPanel({
 
       {/* Placeholder reminder */}
       {placeholders > 0 && <PlaceholderReminder count={placeholders} />}
+
+      {/* LinkedIn URL */}
+      <div id="editor-linkedin" className={`bg-white rounded-[8px] border p-4 ${!cv.linkedin?.trim() ? 'border-[#FCA5A5] bg-[#FFF5F5]' : 'border-[#DDDDDD]'}`} style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <div className="flex items-center gap-2 mb-2">
+          <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide">LinkedIn</h2>
+          {!cv.linkedin?.trim() && (
+            <span className="text-[10px] font-semibold text-red-600 bg-red-100 border border-red-200 rounded px-1.5 py-0.5 leading-none">CRITICAL</span>
+          )}
+        </div>
+        <input
+          id="linkedin-input"
+          type="url"
+          value={cv.linkedin ?? ''}
+          onChange={e => onLinkedInChange(e.target.value)}
+          placeholder="linkedin.com/in/yourname"
+          className="w-full text-[13px] text-[#222222] bg-transparent border border-[#DDDDDD] rounded-[6px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 placeholder:text-[#BBBBBB]"
+        />
+        {!cv.linkedin?.trim() && (
+          <p className="text-[11px] text-red-500 mt-1.5">Recruiters check LinkedIn first — a missing URL costs you interviews.</p>
+        )}
+      </div>
 
       {/* Summary — always shown; nudge when missing */}
       <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-5" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -1161,6 +1184,7 @@ function ScorePageContent() {
   }, [scheduleSave])
 
   // ── CV updaters ───────────────────────────────────────────────────────────
+  const updateLinkedIn = (linkedin: string) => { const u = { ...cv!, linkedin }; setCV(u); scheduleSave(u) }
   const updateSummary = (summary: string) => { const u = { ...cv!, summary }; setCV(u); scheduleSave(u) }
   const updateRole = (index: number, role: ExperienceRole) => {
     const experience = [...(cv?.experience ?? [])]; experience[index] = role
@@ -1255,6 +1279,7 @@ function ScorePageContent() {
   const editorPanelProps = {
     cv,
     saveStatus,
+    onLinkedInChange: updateLinkedIn,
     onSummaryChange: updateSummary,
     onRoleChange: updateRole,
     onSkillsChange: updateSkills,

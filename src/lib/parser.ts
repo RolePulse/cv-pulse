@@ -961,6 +961,28 @@ export function calculateConfidence(text: string, structured: StructuredCV): Con
   return { score, reasons }
 }
 
+// ─── LinkedIn URL extraction ──────────────────────────────────────────────────
+// Scans the first 20 lines (header/contact area) for a LinkedIn URL or handle.
+// Returns a normalised URL string or undefined.
+
+export function extractLinkedIn(rawText: string): string | undefined {
+  const lines = rawText.split('\n').slice(0, 20)
+  for (const line of lines) {
+    const lower = line.toLowerCase().trim()
+    // Full URL: linkedin.com/in/handle or www.linkedin.com/in/handle
+    const urlMatch = lower.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([\w-]+)\/?/)
+    if (urlMatch) {
+      return `linkedin.com/in/${urlMatch[1]}`
+    }
+    // Bare /in/handle pattern (sometimes PDFs strip the domain)
+    const handleMatch = lower.match(/\/in\/([\w-]{3,60})\b/)
+    if (handleMatch) {
+      return `linkedin.com/in/${handleMatch[1]}`
+    }
+  }
+  return undefined
+}
+
 // ─── Main parse output ────────────────────────────────────────────────────────
 
 export interface ParseResult {
@@ -1030,6 +1052,7 @@ export function parseText(text: string): ParseResult {
   }
 
   const structured: StructuredCV = {
+    linkedin: extractLinkedIn(rawText),
     summary: sections.summary || '',
     experience: experienceRoles,
     skills: extractSkills(sections.skills || ''),

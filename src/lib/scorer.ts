@@ -301,12 +301,11 @@ function checkCriticalConcerns(
     })
   }
 
-  // 2. LinkedIn — check for URL or standalone "linkedin" word in header area
-  // Many PDFs render LinkedIn as a clickable text label without extracting the full URL.
-  // We check: (a) linkedin.com URL anywhere, (b) /in/handle pattern,
-  // (c) "linkedin" as a word in the first 20 lines (header/contact area)
+  // 2. LinkedIn — use structured.linkedin (parsed by the parser) as primary source.
+  // Fall back to rawText scan for CVs uploaded before the linkedin field was added.
   const headerText = rawText.split('\n').slice(0, 20).join('\n').toLowerCase()
   const hasLinkedIn =
+    !!structured.linkedin ||
     lower.includes('linkedin.com') ||
     /\/in\/[\w-]{3,}/i.test(rawText) ||
     /\blinkedin\b/.test(headerText)
@@ -315,7 +314,7 @@ function checkCriticalConcerns(
     checklistItems.push({
       id: 'missing-linkedin',
       category: 'critical',
-      action: 'Add your LinkedIn profile URL (linkedin.com/in/yourname)',
+      action: 'Add your LinkedIn URL in the editor (CV editor → LinkedIn field)',
       whyItMatters: 'Most GTM recruiters check LinkedIn before responding to any application. A missing URL signals something to hide.',
       potentialPoints: 0,
       done: false,

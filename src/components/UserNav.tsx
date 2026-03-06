@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { identifyUser, resetUser } from '@/lib/posthog'
 
 export default function UserNav() {
   const [initial, setInitial] = useState<string>('?')
@@ -13,11 +14,13 @@ export default function UserNav() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user?.email) {
         setInitial(user.email[0].toUpperCase())
+        identifyUser(user.id, user.email)
       }
     })
   }, [])
 
   async function handleSignOut() {
+    resetUser()
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()

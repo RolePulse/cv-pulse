@@ -10,6 +10,7 @@ import AlertBanner from '@/components/AlertBanner'
 import { createClient } from '@/lib/supabase/client'
 import { ALL_ROLES, ROLE_LABELS, ROLE_DESCRIPTIONS, type TargetRole } from '@/lib/roleDetect'
 import PaywallModal from '@/components/PaywallModal'
+import { track, identifyUser } from '@/lib/posthog'
 
 type UploadStep = 'idle' | 'parsing' | 'structuring' | 'validating' | 'ready' | 'failed' | 'gate_failed'
 
@@ -53,6 +54,7 @@ export default function UploadPage() {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       setIsSignedIn(!!user)
       if (user) {
+        identifyUser(user.id, user.email ?? undefined)
         const { data: cvs } = await supabase
           .from('cvs')
           .select('id')
@@ -178,6 +180,7 @@ export default function UploadPage() {
     setError(null)
     setGateReason(null)
     setTermsError(false)
+    track('upload_started', { method: file ? 'file' : 'paste', role: selectedRole ?? null })
 
     // Run animation and fetch in parallel — wait for BOTH before showing result.
     // This ensures the loading UI always completes its sequence (good UX) and the
@@ -185,21 +188,25 @@ export default function UploadPage() {
     const [data] = await Promise.all([doUpload(), animateSteps()])
 
     if (data._netError) {
+      track('upload_failed', { reason: 'network_error' })
       setStep('failed')
       setError('Network error — check your connection and try again.')
       return
     }
     if (data._authError) {
+      track('upload_failed', { reason: 'auth_error' })
       setStep('failed')
       setError('You need to sign in before uploading your CV.')
       return
     }
     if (data._parseError) {
+      track('upload_failed', { reason: 'parse_error' })
       setStep('failed')
       setError('Unexpected response from the server — please try again.')
       return
     }
     if (data._paywallHit) {
+      track('paywall_shown', { trigger: 'second_upload' })
       setStep('idle')
       setPaywallOpen(true)
       return
@@ -211,15 +218,17 @@ export default function UploadPage() {
   async function handleResult(data: { ok: boolean; cvId?: string; failReason?: string; error?: string }) {
     if (!data.ok) {
       if (data.failReason) {
-        // Confidence gate failure
+        track('upload_failed', { reason: 'confidence_gate', fail_reason: data.failReason })
         setStep('gate_failed')
         setGateReason(data.failReason)
       } else {
+        track('upload_failed', { reason: 'server_error', error: data.error })
         setStep('failed')
         setError(data.error || 'Something went wrong — please try again.')
       }
       return
     }
+    track('upload_completed', { cv_id: data.cvId, role: selectedRole ?? null })
 
     // Patch selected role before navigating
     if (selectedRole && data.cvId) {

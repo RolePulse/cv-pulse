@@ -15,6 +15,7 @@ import { detectAvailableFixes, applyFix } from '@/lib/cvFixes'
 import type { AvailableFix } from '@/lib/cvFixes'
 import SkillTagInput from '@/components/SkillTagInput'
 import { DEMO_CV, DEMO_SCORE } from '@/lib/demoData'
+import { track, identifyUser } from '@/lib/posthog'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -560,13 +561,17 @@ function ScorePanel({
   // Share trigger — used by both pass banner and the share section below
   const triggerShare = async () => {
     if (isDemo || shareUrl || shareLoading) return
+    track('share_results_clicked', { cv_id: cvId, score: result?.overallScore })
     setShareLoading(true)
     setShareError(null)
     try {
       const res = await fetch(`/api/cv/${cvId}/share`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok || !data.ok) setShareError(data.error || 'Could not create link')
-      else setShareUrl(data.shareUrl)
+      else {
+        setShareUrl(data.shareUrl)
+        track('share_link_created', { cv_id: cvId, score: result?.overallScore })
+      }
     } catch { setShareError('Network error') }
     setShareLoading(false)
   }
@@ -760,6 +765,7 @@ function ScorePanel({
       {/* JD Match CTA */}
       <Link
         href={`/jd-match?cv=${cvId}`}
+        onClick={() => track('jd_match_clicked', { cv_id: cvId, score: result?.overallScore })}
         className="block bg-[#FFFAF7] rounded-[8px] border border-[#FFD4B3] p-4 mb-3 hover:border-[#FF6B00] hover:bg-[#FFF0E6] transition-all group"
         style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
       >
@@ -931,7 +937,7 @@ function EditorPanel({
 
       {/* Export CTA */}
       <div className="pt-2">
-        <Button variant="secondary" size="md" className="w-full justify-center" onClick={() => router.push(`/export?cv=${cvId}`)}>
+        <Button variant="secondary" size="md" className="w-full justify-center" onClick={() => { track('export_clicked', { cv_id: cvId }); router.push(`/export?cv=${cvId}`) }}>
           Export PDF →
         </Button>
       </div>
@@ -983,6 +989,7 @@ function ScorePageContent() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/upload'); return }
+      identifyUser(user.id, user.email ?? undefined)
 
       try {
         const [cvRes, scoreRes] = await Promise.all([
@@ -1026,6 +1033,12 @@ function ScorePageContent() {
         // Seed from the API's initialScore (first-ever score for this CV)
         // so the "X → Y" arc persists across page refreshes and navigations.
         setInitialScore(scoreData.initialScore ?? scoreResult.overallScore)
+        track('score_viewed', {
+          score: scoreResult.overallScore,
+          pass_fail: scoreResult.passFail,
+          role: cvData.role ?? 'unknown',
+          cv_id: cvId,
+        })
       } catch {
         setError('Network error — please check your connection and try again.')
       }
@@ -1087,6 +1100,7 @@ function ScorePageContent() {
   const handleRescore = useCallback(async () => {
     if (isDemo) { router.push('/upload'); return }
     if (!cvId || isRescoring) return
+    track('rescore_clicked', { cv_id: cvId, current_score: resultRef.current?.overallScore })
     setIsRescoring(true)
     await flushSave()
     try {
@@ -1120,6 +1134,13 @@ function ScorePageContent() {
         }
       }
 
+      track('rescore_completed', {
+        cv_id: cvId,
+        old_score: oldResult?.overallScore ?? null,
+        new_score: newResult.overallScore,
+        delta: (oldResult ? newResult.overallScore - oldResult.overallScore : null),
+        pass_fail: newResult.passFail,
+      })
       resultRef.current = newResult
       setResult(newResult)
     } catch {
@@ -1212,6 +1233,7 @@ function ScorePageContent() {
     onApplyFix: handleApplyFix,
     isDemo,
     onSwitchToEdit: () => {
+      track('fix_in_editor_clicked', { cv_id: cvId, score: result?.overallScore })
       if (window.innerWidth >= 768) {
         // Desktop: editor panel is always visible — scroll it into view then focus first input
         const panel = document.getElementById('desktop-editor-panel')

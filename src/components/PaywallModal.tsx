@@ -7,6 +7,7 @@
 import { useRouter } from 'next/navigation'
 import Modal from '@/components/Modal'
 import Button from '@/components/Button'
+import { track } from '@/lib/posthog'
 
 interface PaywallModalProps {
   isOpen: boolean
@@ -77,7 +78,7 @@ export default function PaywallModal({ isOpen, onClose, action, closeLabel = 'Ma
             variant="primary"
             size="md"
             className="w-full justify-center"
-            onClick={() => { onClose(); router.push('/upgrade') }}
+            onClick={() => { track('upgrade_clicked', { trigger: action }); onClose(); router.push('/upgrade') }}
           >
             Upgrade — £9/month →
           </Button>

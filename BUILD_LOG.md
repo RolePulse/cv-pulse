@@ -357,3 +357,36 @@ Formula: `overallScore = Math.max(0, rawBucketScore - criticalPenalty)`
 ### Notes
 - Existing CVs in DB will show a lower score on next re-score if they have critical concerns — this is correct behaviour, not a regression
 - Score improvements from fixing LinkedIn/email are now real and visible
+
+---
+
+## Product Change — ATS/keywords bucket removed (2026-03-06 13:41 GMT)
+
+**Commits:** f69e57f (main change), ba6e365 (build fix)
+
+### What changed
+Product direction change — generic keyword lists were giving actively bad advice
+(e.g. telling an enterprise new-logo AE to add "upsell" keywords).
+
+**ATS/keywords bucket (25 pts) removed from general score entirely.**
+Redistributed proportionally to remaining 3 buckets (Option A — proportional):
+- Proof of Impact: 35 → **47** (×47/35)
+- Formatting:      20 → **27** (×27/20)
+- Clarity:         20 → **26** (×26/20)
+
+Keywords now ONLY appear in JD Match, where advice is role-specific and actually useful.
+
+### Files changed
+- `src/lib/scorer.ts` — ATS bucket removed, scaling helpers added, potentialPoints scaled
+- `src/app/score/page.tsx` — 3 bucket bars, keywords section removed, JD Match CTA promoted
+- `src/lib/demoData.ts` — DEMO_SCORE updated to 3 buckets (score: 64)
+- `src/app/page.tsx` — homepage demo updated, "four key" → "three key"
+- `src/app/share/[token]/page.tsx` — BUCKET_CONFIG updated to 3 buckets
+- `src/types/database.ts` — BucketScores comments updated
+- `src/app/api/cv/[id]/score/route.ts` — ats_keywords written as 0 (DB compat)
+- `scripts/*.ts` — all ATS/keyword references removed (caused Vercel build failure)
+
+### Test results
+- 851/851 tests passing
+- Zero TypeScript errors (including scripts/)
+- Browser tested ✅ — 3 buckets confirmed, keywords section gone, JD Match CTA present

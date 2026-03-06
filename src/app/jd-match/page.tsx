@@ -119,6 +119,12 @@ function JDMatchContent() {
   const [resolvedCvId, setResolvedCvId] = useState<string | null>(cvId)
   const [isSignedIn, setIsSignedIn] = useState(false)
 
+  // ── URL fetch state ───────────────────────────────────────────────────────
+  const [urlInput, setUrlInput] = useState('')
+  const [urlLoading, setUrlLoading] = useState(false)
+  const [urlError, setUrlError] = useState<string | null>(null)
+  const [fetchedDomain, setFetchedDomain] = useState<string | null>(null)
+
   // Pre-fill JD text from URL param (used by RolePulse deep links)
   useEffect(() => {
     if (!jdParam) return
@@ -227,6 +233,29 @@ function JDMatchContent() {
     }
   }
 
+  async function fetchFromUrl() {
+    const trimmed = urlInput.trim()
+    if (!trimmed) return
+    setUrlLoading(true)
+    setUrlError(null)
+    setFetchedDomain(null)
+    try {
+      const res = await fetch(`/api/jd-fetch?url=${encodeURIComponent(trimmed)}`)
+      const data = await res.json()
+      if (!data.ok) {
+        setUrlError(data.error ?? "Couldn't fetch that URL — paste the job description text instead.")
+        return
+      }
+      setJdText(data.text)
+      setFetchedDomain(data.domain ?? null)
+      setUrlInput('')
+    } catch {
+      setUrlError("Couldn't fetch that URL — paste the job description text instead.")
+    } finally {
+      setUrlLoading(false)
+    }
+  }
+
   const canCheck = jdText.trim().length >= 100 && !loading && !isPaywalled && !!resolvedCvId
 
   return (
@@ -288,6 +317,50 @@ function JDMatchContent() {
               </span>
             </div>
           )}
+
+          {/* URL fetch input */}
+          {!isPaywalled && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[#222222] mb-1.5">
+                Job posting URL <span className="text-[#999999] font-normal text-xs ml-1">Greenhouse, Lever, Ashby, and most career pages</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => { setUrlInput(e.target.value); setUrlError(null) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); fetchFromUrl() } }}
+                  placeholder="https://jobs.lever.co/company/…"
+                  disabled={urlLoading}
+                  className="flex-1 text-sm text-[#222222] border border-[#DDDDDD] rounded-[6px] px-3 py-2.5 focus:outline-none focus:border-[#FF6B00] transition-colors placeholder:text-[#999999] disabled:bg-[#F8F8F8]"
+                />
+                <button
+                  type="button"
+                  onClick={fetchFromUrl}
+                  disabled={!urlInput.trim() || urlLoading}
+                  className="text-sm font-medium px-4 py-2.5 rounded-[6px] bg-[#FF6B00] text-white hover:bg-[#E05A00] disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                >
+                  {urlLoading ? 'Fetching…' : 'Fetch JD'}
+                </button>
+              </div>
+              {urlError && (
+                <p className="text-xs text-[#DC2626] mt-1.5">{urlError}</p>
+              )}
+              {fetchedDomain && !urlError && (
+                <p className="text-xs text-[#16A34A] mt-1.5">✓ Job description fetched from {fetchedDomain} — review below, then check match.</p>
+              )}
+            </div>
+          )}
+
+          {/* Divider */}
+          {!isPaywalled && (
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-px bg-[#EEEEEE]" />
+              <span className="text-xs text-[#BBBBBB] uppercase tracking-wide">or paste text</span>
+              <div className="flex-1 h-px bg-[#EEEEEE]" />
+            </div>
+          )}
+
           <label className="block text-sm font-medium text-[#222222] mb-2">
             Job description
           </label>
@@ -295,7 +368,7 @@ function JDMatchContent() {
             value={jdText}
             onChange={(e) => setJdText(e.target.value)}
             placeholder="Paste the full job description here…"
-            rows={10}
+            rows={jdText.length > 0 ? 10 : 4}
             disabled={isPaywalled}
             className="w-full text-sm text-[#222222] border border-[#DDDDDD] rounded-[6px] px-3 py-2.5 focus:outline-none focus:border-[#FF6B00] resize-none transition-colors placeholder:text-[#999999] disabled:bg-[#F8F8F8] disabled:cursor-not-allowed"
           />

@@ -58,6 +58,9 @@ function isSafeUrl(raw: string): { ok: boolean; reason?: string; hostname?: stri
 
 function extractText(html: string): string {
   return html
+    // Decode angle-bracket entities first so encoded HTML tags are treated as real tags.
+    // Greenhouse (and some other ATS APIs) return entity-encoded HTML like &lt;h2&gt;.
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     // Remove non-content blocks entirely
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
@@ -70,16 +73,17 @@ function extractText(html: string): string {
     .replace(/<\/?(p|div|li|ul|ol|h[1-6]|section|article|main|aside|tr)[^>]*>/gi, '\n')
     // Strip all remaining tags
     .replace(/<[^>]+>/g, ' ')
-    // Decode common HTML entities
+    // Decode HTML entities (named, decimal, and hex)
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&nbsp;/g, ' ')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/&#39;|&apos;/g, "'")
     .replace(/&mdash;/g, '\u2014')
     .replace(/&ndash;/g, '\u2013')
     .replace(/&bull;/g, '\u2022')
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
     .replace(/&[a-z]+;/gi, ' ')
     // Tidy whitespace
@@ -87,6 +91,50 @@ function extractText(html: string): string {
     .replace(/\n[ \t]+/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+}
+
+// ── ATS-specific helpers ──────────────────────────────────────────────────────
+
+/**
+ * Detect and parse a Greenhouse job URL.
+ * Handles boards.greenhouse.io, job-boards.greenhouse.io, boards.eu.greenhouse.io
+ * Returns { board, jobId } or null if not a Greenhouse URL.
+ */
+function parseGreenhouseUrl(url: URL): { board: string; jobId: string } | null {
+  const host = url.hostname.toLowerCase()
+  if (!host.includes('greenhouse.io')) return null
+
+  // Pattern: /board-slug/jobs/12345  OR  /board-slug/jobs/12345/...
+  const match = url.pathname.match(/^\/([^/]+)\/jobs\/(\d+)(?:\/|$)/)
+  if (!match) return null
+
+  return { board: match[1], jobId: match[2] }
+}
+
+/**
+ * Fetch a Greenhouse job via the public Greenhouse API (no auth required).
+ * Returns extracted plain text of the job description, or null on failure.
+ */
+async function fetchGreenhouseJob(board: string, jobId: string): Promise<string | null> {
+  try {
+    const apiUrl = `https://api.greenhouse.io/v1/boards/${board}/jobs/${jobId}?content=true`
+    const res = await fetch(apiUrl, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!res.ok) return null
+
+    const data = await res.json() as { title?: string; content?: string; location?: { name?: string } }
+    if (!data.content) return null
+
+    // Build clean text: title + location + stripped HTML body
+    const titleLine = [data.title, data.location?.name].filter(Boolean).join(' — ')
+    const body = extractText(data.content)
+
+    return [titleLine, body].filter(Boolean).join('\n\n')
+  } catch {
+    return null
+  }
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -111,8 +159,25 @@ export async function GET(req: NextRequest) {
     }, { status: 422 })
   }
 
-  // ── Attempt 1: direct fetch (fast, works for SSR pages) ──────────────────
+  // ── Attempt 1: Greenhouse public API (reliable, no CAPTCHA) ─────────────
+  // Greenhouse exposes a public jobs API — much more reliable than scraping.
   let text = ''
+
+  const urlObj = new URL(raw)
+  const ghJob = parseGreenhouseUrl(urlObj)
+  if (ghJob) {
+    const ghText = await fetchGreenhouseJob(ghJob.board, ghJob.jobId)
+    if (ghText && ghText.length >= 100) {
+      return NextResponse.json({
+        ok: true,
+        text: ghText.slice(0, 15_000),
+        domain: safety.hostname,
+        charCount: Math.min(ghText.length, 15_000),
+      })
+    }
+  }
+
+  // ── Attempt 2: direct fetch (fast, works for SSR pages) ──────────────────
 
   try {
     const controller = new AbortController()
@@ -145,7 +210,7 @@ export async function GET(req: NextRequest) {
     // Direct fetch failed — will try Jina below
   }
 
-  // ── Attempt 2: Jina AI Reader (handles JS-rendered pages like Greenhouse, Lever, Ashby) ──
+  // ── Attempt 3: Jina AI Reader (handles JS-rendered pages, fallback for non-Greenhouse ATS) ──
   // r.jina.ai is a free service that fetches and renders pages, returning clean text.
   // We use it as a fallback when direct fetch returns too little content.
   if (text.length < 200) {
@@ -165,16 +230,25 @@ export async function GET(req: NextRequest) {
       clearTimeout(timeoutId)
 
       if (jinaRes.ok) {
-        const jinaText = await jinaRes.text()
-        // Jina returns Markdown — strip any remaining markdown syntax for cleaner text
-        const cleaned = jinaText
-          .replace(/^#{1,6}\s+/gm, '')  // headings
-          .replace(/\*\*(.*?)\*\*/g, '$1')  // bold
-          .replace(/\*(.*?)\*/g, '$1')  // italic
-          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // links → text
-          .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')  // images → remove
-          .replace(/`{1,3}[^`]*`{1,3}/g, '')  // code spans
-          .replace(/^[-*+]\s+/gm, '• ')  // list items
+        const jinaRaw = await jinaRes.text()
+
+        // Jina prepends metadata (Title / URL Source / Warning) before "Markdown Content:".
+        // Extract only what comes after the marker so the textarea shows the actual JD body.
+        const marker = 'Markdown Content:'
+        const markerIdx = jinaRaw.indexOf(marker)
+        const contentRaw = markerIdx >= 0
+          ? jinaRaw.slice(markerIdx + marker.length)
+          : jinaRaw
+
+        const cleaned = contentRaw
+          .replace(/^#{1,6}\s+/gm, '')                      // strip heading markers
+          .replace(/\*\*(.*?)\*\*/g, '$1')                  // bold → plain
+          .replace(/\*(.*?)\*/g, '$1')                      // italic → plain
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')          // links → link text only
+          .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')           // images → remove
+          .replace(/`{1,3}[^`]*`{1,3}/g, '')               // code spans → remove
+          .replace(/^[-*+]\s+/gm, '• ')                    // list bullets → •
+          .replace(/^\s*\|\s.*$/gm, '')                     // strip markdown table rows
           // Decode HTML entities that Jina sometimes outputs in Markdown
           .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
           .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
@@ -182,6 +256,7 @@ export async function GET(req: NextRequest) {
           .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
           .replace(/\n{3,}/g, '\n\n')
           .trim()
+
         if (cleaned.length >= 200) {
           text = cleaned
         }

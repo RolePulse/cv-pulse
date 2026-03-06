@@ -137,7 +137,10 @@ export function detectAvailableFixes(cv: StructuredCV): AvailableFix[] {
   const roles = cv.experience ?? []
 
   // 1. Paragraph bullets (bullet text > 150 chars — likely a prose paragraph)
-  const paraRoles = roles.filter((r) => r.bullets.some((b) => b.trim().length > 150))
+  // Exclude template/placeholder bullets starting with '[' — they're structural, not content
+  const paraRoles = roles.filter((r) =>
+    r.bullets.some((b) => !b.trim().startsWith('[') && b.trim().length > 150)
+  )
   if (paraRoles.length > 0) {
     fixes.push({
       id: 'convert-paragraphs',
@@ -254,7 +257,48 @@ export function applyFix(cv: StructuredCV, fixId: FixId): StructuredCV {
 
 // ─── Fix implementations ──────────────────────────────────────────────────────
 
-/** Split long bullets (>150 chars) on sentence boundaries into multiple shorter bullets */
+/** Split a single long bullet into 2 shorter ones. Returns original if no good split found. */
+function splitLongBullet(bullet: string): string[] {
+  const trimmed = bullet.trim()
+
+  // Never split template / placeholder bullets (e.g. [Gap note: ...], [Add metric: ...])
+  if (trimmed.startsWith('[')) return [bullet]
+
+  // 1. Try period-based sentence split — good when bullet contains multiple sentences
+  const sentenceParts = trimmed
+    .split(/\.\s+/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 20)
+  if (sentenceParts.length >= 2) {
+    return sentenceParts.map((p) => (p.endsWith('.') ? p : p + '.'))
+  }
+
+  // 2. Fallback: split at the comma closest to the midpoint of the text
+  //    This handles long run-on bullets that don't use full stops internally.
+  const mid = Math.floor(trimmed.length / 2)
+  const commaPositions: number[] = []
+  for (let i = 0; i < trimmed.length; i++) {
+    if (trimmed[i] === ',' && trimmed[i + 1] === ' ') commaPositions.push(i)
+  }
+  if (commaPositions.length > 0) {
+    const best = commaPositions.reduce((a, b) =>
+      Math.abs(a - mid) < Math.abs(b - mid) ? a : b
+    )
+    const part1 = trimmed.slice(0, best).trim()
+    // Strip leading conjunctions that read oddly at the start of a bullet (e.g. "And advertising...")
+    const part2 = trimmed.slice(best + 2).trim().replace(/^(and|but|or|while|whereas|to)\s+/i, '')
+    if (part1.length > 30 && part2.length > 30) {
+      const p1 = part1.endsWith('.') ? part1 : part1 + '.'
+      const p2raw = part2.charAt(0).toUpperCase() + part2.slice(1)
+      const p2 = p2raw.endsWith('.') ? p2raw : p2raw + '.'
+      return [p1, p2]
+    }
+  }
+
+  return [bullet]
+}
+
+/** Split long bullets (>150 chars) on sentence/clause boundaries into multiple shorter bullets */
 function applyConvertParagraphs(cv: StructuredCV): StructuredCV {
   return {
     ...cv,
@@ -262,14 +306,7 @@ function applyConvertParagraphs(cv: StructuredCV): StructuredCV {
       ...role,
       bullets: role.bullets.flatMap((bullet) => {
         if (bullet.trim().length <= 150) return [bullet]
-        // Split on ". " where both halves are > 20 chars
-        const parts = bullet
-          .split(/\.\s+/)
-          .map((p) => p.trim())
-          .filter((p) => p.length > 20)
-        if (parts.length < 2) return [bullet]
-        // Re-add trailing period where needed
-        return parts.map((p) => (p.endsWith('.') ? p : p + '.'))
+        return splitLongBullet(bullet)
       }),
     })),
   }

@@ -340,7 +340,7 @@ function RoleCard({
         <EditableInput value={role.title} onChange={(v) => onChange({ ...role, title: v })} placeholder="Job title" className="font-semibold text-[#222222] text-[15px]" />
         <div className="flex items-center gap-1 flex-wrap">
           <EditableInput value={role.company} onChange={(v) => onChange({ ...role, company: v })} placeholder="Company" className="text-[#555555]" />
-          <span className="text-[#BBBBBB] text-xs">·</span>
+          {role.company && role.company.trim() && <span className="text-[#BBBBBB] text-xs">·</span>}
           <EditableInput value={role.start} onChange={(v) => onChange({ ...role, start: v })} placeholder="Start" className="text-[#555555] w-24" />
           <span className="text-[#BBBBBB] text-xs">–</span>
           <EditableInput value={role.end ?? 'Present'} onChange={(v) => onChange({ ...role, end: v || null })} placeholder="End / Present" className="text-[#555555] w-24" />

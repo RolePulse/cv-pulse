@@ -724,28 +724,103 @@ export function extractSkills(text: string): string[] {
 
 // ─── Education extraction ─────────────────────────────────────────────────────
 
+// Keywords that strongly signal an institution name (university, college, etc.)
+const INSTITUTION_KEYWORDS = /\b(university|college|institute|school|academy|polytechnic|college\s+of|school\s+of|faculty\s+of)\b/i
+
+// Keywords that signal a qualification / degree field
+const QUALIFICATION_KEYWORDS = /\b(bachelor|master|mba|msc|bsc|ba\b|bs\b|ma\b|phd|ph\.d|associate|diploma|certificate|hnd|a-level|foundation|llb|llm|beng|meng)\b/i
+
+// Extracts degree abbreviation from patterns like "Jacksonville - (AA)" or "(BS)"
+function extractDegreeAbbr(s: string): string {
+  const m = s.match(/\(([A-Z]{2,4})\)/)
+  return m ? m[1] : ''
+}
+
+// Returns true if a string is primarily a location (City, State or City - (ABBR))
+function looksLikePureLocation(s: string): boolean {
+  const t = s.trim()
+  // "City, State" or "City, Country" pattern
+  if (/^[A-Za-z][A-Za-z\s\-]+,\s*[A-Za-z]{2,}\s*$/.test(t)) return true
+  // "City - (AA)" or "City-(BS)"
+  if (/^[A-Za-z][A-Za-z\s]+\s*-\s*\([A-Z]{2,4}\)$/.test(t)) return true
+  // Just a city name: "Jacksonville"
+  if (/^[A-Z][a-z]{2,20}$/.test(t) && !INSTITUTION_KEYWORDS.test(t)) return true
+  return false
+}
+
 export function extractEducation(text: string): EducationEntry[] {
   if (!text.trim()) return []
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
   const entries: EducationEntry[] = []
   let i = 0
+
   while (i < lines.length) {
     const line = lines[i]
     const yearMatch = line.match(/\b((?:19|20)\d{2})\b/)
     const year = yearMatch ? yearMatch[1] : ''
     let institution = '', qualification = ''
-    if (/\s+at\s+|\|/.test(line)) {
-      const parts = line.split(/\s+at\s+|\|/).map(s => s.replace(/\b(?:19|20)\d{2}\b/g, '').trim())
-      qualification = parts[0] || ''
-      institution = parts[1] || ''
+
+    if (/\|/.test(line)) {
+      // Split on pipes, strip years, trim
+      const parts = line.split('|').map(s => s.replace(/\b(?:19|20)\d{2}\b[-–]?(?:\d{4})?/g, '').trim()).filter(Boolean)
+
+      if (parts.length >= 3) {
+        // 3-part: Qualification | Institution | Year (reconstructed format)
+        qualification = parts[0]
+        institution = parts[1]
+      } else if (parts.length === 2) {
+        const [left, right] = parts
+
+        if (looksLikePureLocation(right)) {
+          // Right is a location — left could be institution OR qualification
+          // Check next line: if next line has a left part that looks like a degree field,
+          // current left = institution, next left = qualification
+          const next = lines[i + 1] || ''
+          const nextParts = next ? next.split('|').map(s => s.trim()) : []
+          const nextLeft = nextParts[0] || ''
+          const nextRight = nextParts[1] || ''
+
+          if (nextLeft && (QUALIFICATION_KEYWORDS.test(nextLeft) || (!INSTITUTION_KEYWORDS.test(nextLeft) && looksLikePureLocation(nextRight || '')))) {
+            // Two-line pattern: institution + location on line 1, qualification + location on line 2
+            institution = left.replace(/\s+at\s*$/, '').trim()   // strip trailing " at"
+            qualification = nextLeft
+            // Absorb degree abbreviation from line 1's right side if present
+            const abbr = extractDegreeAbbr(right)
+            if (abbr && !qualification.includes(abbr)) qualification += ` (${abbr})`
+            i++ // consume next line
+          } else if (INSTITUTION_KEYWORDS.test(left)) {
+            // Left is clearly an institution name, right is a location
+            institution = left.replace(/\s+at\s*$/, '').trim()
+            const abbr = extractDegreeAbbr(right)
+            if (abbr) qualification = abbr
+          } else {
+            // Default: left = qualification, right = location (drop location)
+            qualification = left
+            institution = ''
+          }
+        } else if (INSTITUTION_KEYWORDS.test(left) && !INSTITUTION_KEYWORDS.test(right)) {
+          // Left is institution, right is qualification (e.g. "Harvard | MBA")
+          institution = left.replace(/\s+at\s*$/, '').trim()
+          qualification = right
+        } else {
+          // Default / reconstructed format: left = qualification, right = institution
+          qualification = left
+          institution = right
+        }
+      }
     } else {
+      // No pipe — single line with year, look ahead for institution
       qualification = line.replace(/\b(?:19|20)\d{2}\b[-–]?(?:\d{4})?/g, '').trim()
       const next = lines[i + 1] || ''
-      if (next && !DATE_RANGE_RE.test(next) && !DATE_TOKEN_RE.test(next.slice(0, 8))) {
+      if (next && !DATE_RANGE_RE.test(next) && !DATE_TOKEN_RE.test(next.slice(0, 8)) && !/\|/.test(next)) {
         institution = next.replace(/\b(?:19|20)\d{2}\b/g, '').trim()
         i++
       }
     }
+
+    // Strip trailing " at" from institution name (PDF split artifact)
+    institution = institution.replace(/\s+at\s*$/, '').trim()
+
     if (qualification || institution) entries.push({ institution, qualification, year })
     i++
   }

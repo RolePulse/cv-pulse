@@ -287,6 +287,14 @@ function checkCriticalConcerns(
   const checklistItems: ScorerChecklistItem[] = []
   const lower = rawText.toLowerCase()
 
+  // ── Penalty amounts ────────────────────────────────────────────────────────
+  // Each critical concern subtracts from the overall score so that fixing it
+  // produces a real score improvement. potentialPoints = the penalty applied.
+  const PENALTY_EMAIL    = 8   // instant disqualification without contact details
+  const PENALTY_LINKEDIN = 5   // GTM recruiters always check LinkedIn first
+  const PENALTY_DATES    = 3   // per role missing dates, capped below
+  const PENALTY_GAP      = 3   // unexplained 6+ month gap
+
   // 1. Email address
   const hasEmail = /\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b/.test(rawText)
   if (!hasEmail) {
@@ -296,7 +304,7 @@ function checkCriticalConcerns(
       category: 'critical',
       action: 'Add your email address to the header of your CV',
       whyItMatters: 'Recruiters need to contact you. A CV without an email is an instant disqualification — they will not chase you for it.',
-      potentialPoints: 0,
+      potentialPoints: PENALTY_EMAIL,
       done: false,
     })
   }
@@ -316,7 +324,7 @@ function checkCriticalConcerns(
       category: 'critical',
       action: 'Add your LinkedIn URL in the editor (CV editor → LinkedIn field)',
       whyItMatters: 'Most GTM recruiters check LinkedIn before responding to any application. A missing URL signals something to hide.',
-      potentialPoints: 0,
+      potentialPoints: PENALTY_LINKEDIN,
       done: false,
     })
   }
@@ -327,14 +335,15 @@ function checkCriticalConcerns(
   )
   if (rolesWithNoDates.length > 0) {
     const roleNames = rolesWithNoDates.slice(0, 2).map((r) => `${r.title} at ${r.company}`).join(', ')
+    const datesPenalty = Math.min(9, rolesWithNoDates.length * PENALTY_DATES)
     concerns.push(`Missing dates on ${rolesWithNoDates.length} role(s): ${roleNames}`)
     checklistItems.push({
       id: 'missing-dates',
       category: 'critical',
       action: 'Add start and end dates to every role',
       whyItMatters: 'Missing dates are a red flag — recruiters assume you are hiding something (a short stint, a gap, or exaggerated tenure).',
-      potentialPoints: 0,
-      done: rolesWithNoDates.every((r) => !!parseDateToYM(r.start)),
+      potentialPoints: datesPenalty,
+      done: false,
     })
   }
 
@@ -366,7 +375,7 @@ function checkCriticalConcerns(
       category: 'critical',
       action: 'Address employment gaps directly in your CV (e.g. "Career break — consulting work", "Caregiver leave", "Sabbatical")',
       whyItMatters: 'Unexplained gaps signal risk. A brief, honest label removes the question before a recruiter asks it.',
-      potentialPoints: 0,
+      potentialPoints: PENALTY_GAP,
       done: false, // can only be resolved by adding text — hard to auto-detect
     })
   }
@@ -919,8 +928,12 @@ export function scoreCV(
   const formatting = scoreFormatting(structured, rawText)
   const clarity = scoreClarity(structured, rawText, targetRole)
 
-  // 3. Overall score
-  const overallScore = impact.score + ats.score + formatting.score + clarity.score
+  // 3. Overall score — bucket total minus critical concern penalties
+  // Each unresolved critical concern (missing LinkedIn, email, etc.) deducts its
+  // potentialPoints from the score, so fixing issues produces a real score improvement.
+  const rawBucketScore = impact.score + ats.score + formatting.score + clarity.score
+  const criticalPenalty = criticalItems.reduce((sum, item) => sum + item.potentialPoints, 0)
+  const overallScore = Math.max(0, rawBucketScore - criticalPenalty)
 
   // 4. Pass/fail: 70+ AND no critical concerns
   const passFail = overallScore >= 70 && concerns.length === 0

@@ -463,7 +463,11 @@ function NextFixCard({ items, onFix }: { items: ScoreResult['checklist']; onFix?
 
 // ── Quick fixes panel ─────────────────────────────────────────────────────────
 
-function QuickFixesPanel({ fixes, onApply }: { fixes: AvailableFix[]; onApply: (id: AvailableFix['id']) => void }) {
+function QuickFixesPanel({ fixes, onApply, noChangeFeedback }: {
+  fixes: AvailableFix[]
+  onApply: (id: AvailableFix['id']) => void
+  noChangeFeedback: AvailableFix['id'] | null
+}) {
   if (fixes.length === 0) return null
   return (
     <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-5" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -471,12 +475,19 @@ function QuickFixesPanel({ fixes, onApply }: { fixes: AvailableFix[]; onApply: (
       <p className="text-[11px] text-[#888888] mb-3">One click. Re-score to see impact.</p>
       <div className="space-y-2">
         {fixes.map((fix) => (
-          <div key={fix.id} className="flex items-start gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-[#333333] leading-snug">{fix.label}</p>
-              <p className="text-[10px] text-[#888888] mt-0.5">{fix.description}</p>
+          <div key={fix.id} className="flex flex-col gap-1">
+            <div className="flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-[#333333] leading-snug">{fix.label}</p>
+                <p className="text-[10px] text-[#888888] mt-0.5">{fix.description}</p>
+              </div>
+              <button onClick={() => onApply(fix.id)} className="text-[11px] font-semibold text-[#FF6B00] hover:text-[#E85F00] border border-[#FF6B00] hover:border-[#E85F00] rounded-[4px] px-2 py-0.5 flex-shrink-0 transition-colors cursor-pointer whitespace-nowrap">Apply</button>
             </div>
-            <button onClick={() => onApply(fix.id)} className="text-[11px] font-semibold text-[#FF6B00] hover:text-[#E85F00] border border-[#FF6B00] hover:border-[#E85F00] rounded-[4px] px-2 py-0.5 flex-shrink-0 transition-colors cursor-pointer whitespace-nowrap">Apply</button>
+            {noChangeFeedback === fix.id && (
+              <p className="text-[10px] text-[#888888] bg-[#F5F5F5] rounded px-2 py-1">
+                No sentence breaks found — edit the bullet manually to split it.
+              </p>
+            )}
           </div>
         ))}
       </div>
@@ -527,6 +538,7 @@ function ScorePanel({
   newlyResolvedIds,
   availableFixes,
   onApplyFix,
+  fixNoChangeFeedback,
   hideMobileRescore = false,
   isDemo = false,
   noChangeFlash = false,
@@ -542,6 +554,7 @@ function ScorePanel({
   newlyResolvedIds: Set<string>
   availableFixes: AvailableFix[]
   onApplyFix: (id: AvailableFix['id']) => void
+  fixNoChangeFeedback: AvailableFix['id'] | null
   hideMobileRescore?: boolean
   isDemo?: boolean
   noChangeFlash?: boolean
@@ -687,7 +700,7 @@ function ScorePanel({
         {/* Quick fixes */}
         {availableFixes.length > 0 && (
           <div className="mb-4">
-            <QuickFixesPanel fixes={availableFixes} onApply={onApplyFix} />
+            <QuickFixesPanel fixes={availableFixes} onApply={onApplyFix} noChangeFeedback={fixNoChangeFeedback} />
           </div>
         )}
 
@@ -817,6 +830,10 @@ function ScorePanel({
 function EditorPanel({
   cv,
   saveStatus,
+  onNameChange,
+  onEmailChange,
+  onPhoneChange,
+  onLocationChange,
   onLinkedInChange,
   onSummaryChange,
   onRoleChange,
@@ -829,6 +846,10 @@ function EditorPanel({
 }: {
   cv: StructuredCV
   saveStatus: SaveStatus
+  onNameChange: (v: string) => void
+  onEmailChange: (v: string) => void
+  onPhoneChange: (v: string) => void
+  onLocationChange: (v: string) => void
   onLinkedInChange: (v: string) => void
   onSummaryChange: (v: string) => void
   onRoleChange: (i: number, r: ExperienceRole) => void
@@ -860,6 +881,19 @@ function EditorPanel({
 
       {/* Placeholder reminder */}
       {placeholders > 0 && <PlaceholderReminder count={placeholders} />}
+
+      {/* Contact details */}
+      <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-4" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide mb-3">Contact</h2>
+        <div className="grid grid-cols-1 gap-2">
+          <input type="text" value={cv.name ?? ''} onChange={e => onNameChange(e.target.value)} placeholder="Full name" className="w-full text-[13px] text-[#222222] bg-transparent border border-[#DDDDDD] rounded-[6px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 placeholder:text-[#BBBBBB]" />
+          <div className="grid grid-cols-2 gap-2">
+            <input type="email" value={cv.email ?? ''} onChange={e => onEmailChange(e.target.value)} placeholder="Email address" className="w-full text-[13px] text-[#222222] bg-transparent border border-[#DDDDDD] rounded-[6px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 placeholder:text-[#BBBBBB]" />
+            <input type="tel" value={cv.phone ?? ''} onChange={e => onPhoneChange(e.target.value)} placeholder="Phone number" className="w-full text-[13px] text-[#222222] bg-transparent border border-[#DDDDDD] rounded-[6px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 placeholder:text-[#BBBBBB]" />
+          </div>
+          <input type="text" value={cv.location ?? ''} onChange={e => onLocationChange(e.target.value)} placeholder="Location — e.g. London, UK" className="w-full text-[13px] text-[#222222] bg-transparent border border-[#DDDDDD] rounded-[6px] px-3 py-2 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00]/20 placeholder:text-[#BBBBBB]" />
+        </div>
+      </div>
 
       {/* LinkedIn URL */}
       <div id="editor-linkedin" className={`bg-white rounded-[8px] border p-4 ${!cv.linkedin?.trim() ? 'border-[#FCA5A5] bg-[#FFF5F5]' : 'border-[#DDDDDD]'}`} style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -950,13 +984,14 @@ function EditorPanel({
         </button>
       </div>
 
-      {/* Certifications */}
-      {cv.certifications?.length > 0 && (
-        <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-5" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide mb-3">Certifications</h2>
-          <EditableText value={cv.certifications.join('\n')} onChange={onCertsChange} placeholder="One certification per line…" rows={2} />
-        </div>
-      )}
+      {/* Certifications — always shown so users can add them */}
+      <div className="bg-white rounded-[8px] border border-[#DDDDDD] p-5" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <h2 className="text-[13px] font-semibold text-[#999999] uppercase tracking-wide mb-3">Certifications</h2>
+        {(!cv.certifications || cv.certifications.length === 0) ? (
+          <p className="text-[12px] text-[#BBBBBB] mb-2">No certifications added yet.</p>
+        ) : null}
+        <EditableText value={(cv.certifications ?? []).join('\n')} onChange={onCertsChange} placeholder="One certification per line — e.g. Salesforce Certified Administrator" rows={2} />
+      </div>
 
       {/* Export CTA */}
       <div className="pt-2">
@@ -983,6 +1018,7 @@ function ScorePageContent() {
   const [initialScore, setInitialScore] = useState<number>(0)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [isRescoring, setIsRescoring] = useState(false)
+  const [fixNoChangeFeedback, setFixNoChangeFeedback] = useState<AvailableFix['id'] | null>(null)
   const [availableFixes, setAvailableFixes] = useState<AvailableFix[]>([])
   const [showPassBanner, setShowPassBanner] = useState(false)
   const [noChangeFlash, setNoChangeFlash] = useState(false)
@@ -1178,12 +1214,23 @@ function ScorePageContent() {
     const current = latestCV.current
     if (!current) return
     const updated = applyFix(current, fixId)
+    const changed = JSON.stringify(updated) !== JSON.stringify(current)
+    if (!changed) {
+      setFixNoChangeFeedback(fixId)
+      setTimeout(() => setFixNoChangeFeedback(null), 4000)
+      return
+    }
+    setFixNoChangeFeedback(null)
     latestCV.current = updated
     setCV(updated)
     scheduleSave(updated)
   }, [scheduleSave])
 
   // ── CV updaters ───────────────────────────────────────────────────────────
+  const updateName = (name: string) => { const u = { ...cv!, name }; setCV(u); scheduleSave(u) }
+  const updateEmail = (email: string) => { const u = { ...cv!, email }; setCV(u); scheduleSave(u) }
+  const updatePhone = (phone: string) => { const u = { ...cv!, phone }; setCV(u); scheduleSave(u) }
+  const updateLocation = (location: string) => { const u = { ...cv!, location }; setCV(u); scheduleSave(u) }
   const updateLinkedIn = (linkedin: string) => { const u = { ...cv!, linkedin }; setCV(u); scheduleSave(u) }
   const updateSummary = (summary: string) => { const u = { ...cv!, summary }; setCV(u); scheduleSave(u) }
   const updateRole = (index: number, role: ExperienceRole) => {
@@ -1255,6 +1302,7 @@ function ScorePageContent() {
     newlyResolvedIds,
     availableFixes,
     onApplyFix: handleApplyFix,
+    fixNoChangeFeedback,
     isDemo,
     onSwitchToEdit: () => {
       track('fix_in_editor_clicked', { cv_id: cvId, score: result?.overallScore })
@@ -1279,6 +1327,10 @@ function ScorePageContent() {
   const editorPanelProps = {
     cv,
     saveStatus,
+    onNameChange: updateName,
+    onEmailChange: updateEmail,
+    onPhoneChange: updatePhone,
+    onLocationChange: updateLocation,
     onLinkedInChange: updateLinkedIn,
     onSummaryChange: updateSummary,
     onRoleChange: updateRole,

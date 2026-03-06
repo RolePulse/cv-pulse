@@ -1108,6 +1108,43 @@ export function calculateConfidence(text: string, structured: StructuredCV): Con
   return { score, reasons }
 }
 
+// ─── Contact info extraction ──────────────────────────────────────────────────
+// Scans the first 20 lines (header area) for name, email, phone, location.
+
+export function extractContact(rawText: string): { name?: string; email?: string; phone?: string; location?: string } {
+  const lines = rawText.split('\n').slice(0, 20).map(l => l.trim()).filter(Boolean)
+  let email: string | undefined
+  let phone: string | undefined
+  let location: string | undefined
+  let name: string | undefined
+
+  for (const line of lines) {
+    // Stop once we hit a section heading
+    if (/^(SUMMARY|EXPERIENCE|EDUCATION|SKILLS|CERTIFICATIONS|PROFILE|OBJECTIVE)\s*$/i.test(line)) break
+
+    // Email
+    if (!email) {
+      const m = line.match(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i)
+      if (m) { email = m[0].toLowerCase(); continue }
+    }
+    // Phone — various formats: +1 (555) 123-4567, 555-123-4567, (555) 123 4567
+    if (!phone) {
+      const m = line.match(/(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}/)
+      if (m && m[0].replace(/\D/g, '').length >= 7) { phone = m[0].trim(); continue }
+    }
+    // Location — "City, State" or "City, Country"
+    if (!location && looksLikeLocation(line)) { location = line; continue }
+    // Name — first short line that isn't a URL, email, phone, or section heading
+    if (!name && line.length > 3 && line.length < 50 &&
+        !line.includes('@') && !/https?:\/\//.test(line) &&
+        !/\d{5,}/.test(line) && !/linkedin\.|github\./i.test(line) &&
+        /^[A-Z]/.test(line) && !/[•\-–—|]/.test(line)) {
+      name = line
+    }
+  }
+  return { name, email, phone, location }
+}
+
 // ─── LinkedIn URL extraction ──────────────────────────────────────────────────
 // Scans the first 20 lines (header/contact area) for a LinkedIn URL or handle.
 // Returns a normalised URL string or undefined.
@@ -1198,7 +1235,9 @@ export function parseText(text: string): ParseResult {
     experienceRoles = extractExperience(rawText)
   }
 
+  const contact = extractContact(rawText)
   const structured: StructuredCV = {
+    ...contact,
     linkedin: extractLinkedIn(rawText),
     summary: sections.summary || '',
     experience: experienceRoles,

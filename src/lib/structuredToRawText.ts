@@ -7,11 +7,13 @@ import type { StructuredCV } from '@/types/database'
 export function structuredToRawText(s: StructuredCV): string {
   const lines: string[] = []
 
-  // LinkedIn URL — placed at the top (header/contact area) so the scorer's rawText scan finds it
-  if (s.linkedin?.trim()) {
-    lines.push(s.linkedin.trim())
-    lines.push('')
-  }
+  // Contact header — name, location, email, phone, LinkedIn
+  if (s.name?.trim()) lines.push(s.name.trim())
+  if (s.location?.trim()) lines.push(s.location.trim())
+  if (s.email?.trim()) lines.push(s.email.trim())
+  if (s.phone?.trim()) lines.push(s.phone.trim())
+  if (s.linkedin?.trim()) lines.push(s.linkedin.trim())
+  if (s.name || s.location || s.email || s.phone || s.linkedin) lines.push('')
 
   // SUMMARY heading required — parser ignores text before the first detected section heading
   if (s.summary?.trim()) {

@@ -201,6 +201,25 @@ function looksLikeLocation(line: string): boolean {
   return true
 }
 
+// Extends looksLikeLocation to also catch lines like "City, State | Remote" or
+// "City | Hybrid" — common in US-style CVs where work-type is appended with a pipe.
+const WORK_TYPE_RE = /^(remote|hybrid|on-?site|onsite|in-?person|contract|temporary|part-?time|full-?time)\s*$/i
+function looksLikeLocationLine(line: string): boolean {
+  if (looksLikeLocation(line)) return true
+  const trimmed = line.trim()
+  if (trimmed.length > 70) return false
+  const parts = trimmed.split(/\s*\|\s*/)
+  if (parts.length < 2) return false
+  const base = parts[0].trim()
+  const tail = parts[parts.length - 1].trim()
+  // "City, State | Remote/Hybrid" or "City, State | Hybrid | …" (any extra parts are work-type artifacts)
+  if (looksLikeLocation(base) && WORK_TYPE_RE.test(tail)) return true
+  // "City, State | Hybrid" — base is city-state, tail is work-type (already covered above)
+  // Also: bare city | work-type: "Denver | Remote"
+  if (/^[A-Z][a-z]+$/.test(base) && WORK_TYPE_RE.test(tail)) return true
+  return false
+}
+
 // Returns true for street address lines — e.g. "585 N Rossmore Avenue Apt 402, Los Angeles, CA"
 // These appear as page-header artifacts in multi-page CVs and should never be used as titles/companies
 function looksLikeAddress(line: string): boolean {
@@ -367,7 +386,7 @@ export function extractExperience(text: string): ExperienceRole[] {
         prevLine &&
         !looksLikeDateRange(prevLine) &&
         !isBulletLine(prevLine) &&
-        !looksLikeLocation(prevLine) &&
+        !looksLikeLocationLine(prevLine) &&
         !looksLikeSeparator(prevLine) &&
         // Lines with parentheses are almost always company names (e.g. "HiBob (acquired Mosaic)",
         // "AvePoint (Ticker: AV P T ) Jersey City, NJ"), not job titles — don't treat them as a
@@ -377,6 +396,17 @@ export function extractExperience(text: string): ExperienceRole[] {
         // company+location lines, not job titles.
         !/\s[-–]\s*(Remote|Hybrid|On-?site|Onsite|In-?person)\s*$/i.test(prevLine)
       )
+      // Location-before-date: "City, State | Date" or "City, State | WorkType | Date"
+      // e.g. "Denver, Colorado | Hybrid | January 2023 – December 2023"
+      //       "Littleton, Colorado | January 2019 – May 2022"
+      // textBefore is a pure location — title is on the line above, company unknown.
+      if (endsWithPipe && looksLikeLocationLine(textBefore)) {
+        if (prevHasTitle && prevLine) {
+          title = prevLine.trim()
+        }
+        // company stays empty — no company line present in this format
+      }
+
       // Three-part pipe: "Company | Title | Date" (e.g. Clarisse T — "RepeatMD | Manager, Customer Support | Feb 2024")
       // Detect by: endsWithPipe, textBefore contains ' | ', first segment is not a title keyword, second is.
       const pipeParts = textBefore.split(' | ')
@@ -402,9 +432,11 @@ export function extractExperience(text: string): ExperienceRole[] {
         // "Title Date" inline format (no pipe) — the inline text is the title, company is above.
         // e.g. "Enterprise Account Executive Dec 2020 - Aug 2024" with company on line above.
         title = textBefore
-      } else {
+      } else if (!looksLikeLocationLine(textBefore)) {
         company = textBefore
       }
+      // If textBefore looks like a location (e.g. "Denver, Colorado | Hybrid"), leave company
+      // blank — the lookback below will try to find a real company name above.
     }
 
     // Case B: date at line start — "5/2024–4/2025 GIMMECREDIT, Tarrytown NY"
@@ -428,7 +460,7 @@ export function extractExperience(text: string): ExperienceRole[] {
 
     // Skip prev1 if it is blank, a bare location, separator, or bullet from the previous role's content
     // Blank lines between headers and dates are common in templates like Alan Lee / MATRIXX
-    const skip1 = !prev1.trim() || looksLikeLocation(prev1) || looksLikeSeparator(prev1) || isBulletLine(prev1)
+    const skip1 = !prev1.trim() || looksLikeLocationLine(prev1) || looksLikeSeparator(prev1) || isBulletLine(prev1)
     const effective1 = skip1 ? prev2 : prev1
 
     // skip2: also skip location lines one level further back
@@ -458,8 +490,10 @@ export function extractExperience(text: string): ExperienceRole[] {
           if (!ln.trim()) continue
           if (/^[A-Z][A-Z\s&\/\-]{3,}$/.test(ln.trim())) break  // section header → stop
           if (looksLikeSeparator(ln) || isBulletLine(ln)) continue
-          if (looksLikeLocation(ln)) continue
+          if (looksLikeLocationLine(ln)) continue
           if (looksLikeDateRange(ln)) continue  // skip date-range lines (same-company continuation)
+          if (ln.trim() === title) continue      // skip the line we already used as title
+          if (TITLE_KEYWORD_RE.test(ln)) continue // skip title-keyword lines (another role's title)
           companyLine = ln
           break
         }
@@ -468,7 +502,7 @@ export function extractExperience(text: string): ExperienceRole[] {
         // "Company | Date" — company set from inline text, title not yet known.
         // Get title from prev1 (the line above, e.g. "Senior SDR").
         // (When threePartPipe already set both company and title, skip this block.)
-        if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocation(prev1) && !looksLikeSeparator(prev1) && !isBulletLine(prev1)) {
+        if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocationLine(prev1) && !looksLikeSeparator(prev1) && !isBulletLine(prev1)) {
           title = prev1
         }
       }
@@ -481,7 +515,7 @@ export function extractExperience(text: string): ExperienceRole[] {
           /^[A-Z]/.test(l) &&            // company names start uppercase; skip bullet continuations
           !looksLikeDateRange(l) &&
           !isBulletLine(l) &&
-          !looksLikeLocation(l) &&
+          !looksLikeLocationLine(l) &&
           !looksLikeSeparator(l) &&
           !TITLE_KEYWORD_RE.test(l)       // skip another role's title line
       )
@@ -571,7 +605,7 @@ export function extractExperience(text: string): ExperienceRole[] {
       }
     } else if (!title) {
       // Company was set from inline text (non-pipe format) — get title from line above
-      if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocation(prev1) && !looksLikeSeparator(prev1) && !isBulletLine(prev1)) {
+      if (prev1 && !looksLikeDateRange(prev1) && !looksLikeLocationLine(prev1) && !looksLikeSeparator(prev1) && !isBulletLine(prev1)) {
         title = prev1
       }
     }
@@ -582,7 +616,7 @@ export function extractExperience(text: string): ExperienceRole[] {
     // rawEffective2 is non-empty (i.e., the immediate 2–3 line window had a location-like line).
     if (!company && skip2 && rawEffective2.trim()) {
       const recovered = cleanCompanyLine(rawEffective2)
-      if (recovered && recovered.length > 1 && !looksLikeLocation(recovered) && !TITLE_KEYWORD_RE.test(recovered)) {
+      if (recovered && recovered.length > 1 && !looksLikeLocationLine(recovered) && !TITLE_KEYWORD_RE.test(recovered)) {
         company = recovered
       }
     }
@@ -607,7 +641,7 @@ export function extractExperience(text: string): ExperienceRole[] {
         if (TITLE_KEYWORD_RE.test(ln) && !/ - /.test(ln)) continue  // another role's title line
         if (/^[A-Z][A-Z\s&/\-]{3,}$/.test(ln)) break  // section header (e.g. EXPERIENCE) → stop
         const candidate = cleanCompanyLine(ln)
-        if (candidate && candidate.length > 1 && !looksLikeLocation(candidate) && !TITLE_KEYWORD_RE.test(candidate)) {
+        if (candidate && candidate.length > 1 && !looksLikeLocationLine(candidate) && !TITLE_KEYWORD_RE.test(candidate)) {
           company = candidate
           break
         }

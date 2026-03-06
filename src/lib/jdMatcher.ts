@@ -1,17 +1,22 @@
 // CV Pulse — JD Match Engine
 // Epic 9 | Deterministic keyword-based JD matching. No LLM. Same input = same output.
 //
-// Algorithm:
-//   1. Build a universe of known role keywords + tools (from scorer sets)
-//   2. Find which universe keywords appear in the JD → "JD keyword set"
-//   3. Compare JD keyword set against CV raw_text
-//   4. Compute weighted match score:
-//        - target-role keywords in JD  → weight 3 (highest relevance)
-//        - target-role tools in JD     → weight 2
-//        - other keywords in JD        → weight 1
-//   5. For Marketing CVs, infer subtype (demand-gen / content / growth / brand)
+// v2 scoring model (2026-03-06): start at 100, deduct for gaps.
 //
-// All keyword sets are transparent in the UI — no black boxes.
+// Algorithm:
+//   1. Build a universe of known role keywords + tools
+//   2. Find which universe keywords appear in the JD → "JD keyword set"
+//   3. Compare JD keyword set against CV raw_text → matched / missing
+//   4. Detect the JD's role independently (by keyword density)
+//   5. Compute score by deducting from 100:
+//        - Role mismatch:    −25 (CV targeting wrong role for this JD)
+//        - Adjacent role:    −12 (e.g. AE applying to SDR)
+//        - Missing role kws: −3 each, capped at −30
+//        - Missing tools:    −2 each, capped at −12
+//        - Segment mismatch: −8 (JD is enterprise, CV signals SMB)
+//   6. For Marketing CVs, infer subtype (demand-gen / content / growth / brand)
+//
+// All keyword sets and deduction reasons are exposed in the result — no black boxes.
 
 import type { TargetRole } from '@/lib/roleDetect'
 
@@ -122,8 +127,16 @@ export interface JDKeywordGroup {
   missing: string[]
 }
 
+export interface JDDeductions {
+  role: number       // penalty for role mismatch / adjacent role
+  keywords: number   // penalty for missing role keywords
+  tools: number      // penalty for missing tools
+  segment: number    // penalty for seniority/segment mismatch
+  total: number      // sum of all deductions
+}
+
 export interface JDMatchResult {
-  matchScore: number          // 0–100
+  matchScore: number          // 0–100 (100 - deductions)
   jdKeywords: string[]        // full keyword set extracted from JD (transparent)
   matchedKeywords: string[]   // JD keywords present in CV
   missingKeywords: string[]   // JD keywords absent from CV
@@ -132,7 +145,111 @@ export interface JDMatchResult {
     toolKeywords: JDKeywordGroup     // target-role tools, found in JD
     generalKeywords: JDKeywordGroup  // other-role keywords found in JD
   }
-  marketingSubtype?: string   // inferred for Marketing role CVs (demand-gen, content, growth, brand)
+  marketingSubtype?: string          // inferred for Marketing role CVs
+  // v2 scoring fields
+  detectedJDRole: TargetRole | null  // JD's role inferred from keyword density
+  roleAlignment: 'match' | 'adjacent' | 'mismatch'
+  segmentMismatch: boolean           // JD is enterprise, CV signals SMB background
+  deductions: JDDeductions
+}
+
+// ─── Role detection & alignment ───────────────────────────────────────────────
+
+// Pairs of roles considered "adjacent" (one step removed, natural career moves)
+const ADJACENT_PAIRS: Array<[TargetRole, TargetRole]> = [
+  ['SDR',        'AE'],
+  ['SDR',        'Marketing'],  // top-of-funnel overlap
+  ['AE',         'SE'],
+  ['AE',         'CSM'],
+  ['AE',         'Leadership'],
+  ['SE',         'Leadership'],
+  ['CSM',        'Leadership'],
+  ['RevOps',     'AE'],
+  ['RevOps',     'CSM'],
+  ['RevOps',     'Marketing'],
+  ['RevOps',     'Leadership'],
+  ['RevOps',     'SDR'],
+]
+
+function getRoleAlignment(
+  cvRole: TargetRole,
+  jdRole: TargetRole,
+): 'match' | 'adjacent' | 'mismatch' {
+  if (cvRole === jdRole) return 'match'
+  const isAdjacent = ADJACENT_PAIRS.some(
+    ([a, b]) => (a === cvRole && b === jdRole) || (b === cvRole && a === jdRole),
+  )
+  return isAdjacent ? 'adjacent' : 'mismatch'
+}
+
+// Explicit role title patterns — checked first, before keyword density.
+// This prevents strategic/senior AE JDs being misclassified as Leadership
+// because they use words like "strategy", "stakeholder", "scaling".
+const ROLE_TITLE_PATTERNS: Record<TargetRole, RegExp[]> = {
+  SDR:        [/\bsdr\b/i, /\bbdr\b/i, /sales development rep/i, /business development rep/i, /outbound sales rep/i],
+  AE:         [/account executive/i, /\bae\b[^a-z]/i, /closing\s+rep/i, /field sales rep/i],
+  SE:         [/solutions engineer/i, /sales engineer/i, /\bpresales\b/i, /pre-sales/i, /solutions consultant/i],
+  CSM:        [/customer success manager/i, /\bcsm\b/i, /client success/i, /account manager.*success/i],
+  Marketing:  [/marketing manager/i, /demand gen(eration)?\s+manager/i, /content manager/i, /growth manager/i, /head of marketing/i],
+  Leadership: [/\bvp\b.*sales/i, /\bsvp\b/i, /\bevp\b/i, /director of sales/i, /head of sales/i, /chief revenue/i, /\bcro\b/i, /vp of revenue/i],
+  RevOps:     [/revenue operations/i, /\brevops\b/i, /sales operations manager/i, /sales ops/i],
+}
+
+/**
+ * Detect the most likely role this JD is for.
+ * Step 1: look for explicit job title patterns (most reliable).
+ * Step 2: fall back to keyword density if no title match.
+ * Returns null if confidence is too low.
+ */
+function detectJDRole(jdText: string): TargetRole | null {
+  const ROLES: TargetRole[] = ['SDR', 'AE', 'SE', 'CSM', 'Marketing', 'Leadership', 'RevOps']
+
+  // Step 1: explicit title match — check first 3 non-empty lines only.
+  // Restricting to the title area prevents false matches when a role is merely
+  // mentioned mid-JD (e.g. "work closely with Account Executives").
+  const titleArea = jdText.split('\n').filter((l) => l.trim()).slice(0, 3).join(' ')
+  for (const role of ROLES) {
+    if (ROLE_TITLE_PATTERNS[role].some((p) => p.test(titleArea))) {
+      return role
+    }
+  }
+
+  // Step 2: keyword density fallback
+  const lower = jdText.toLowerCase()
+  let best: TargetRole | null = null
+  let bestCount = 0
+
+  for (const role of ROLES) {
+    const all = [...ATS_KEYWORDS[role], ...ROLE_TOOLS[role]]
+    const count = all.filter((kw) => lower.includes(kw.toLowerCase())).length
+    if (count > bestCount) { bestCount = count; best = role }
+  }
+
+  return bestCount >= 3 ? best : null
+}
+
+// ─── Segment (market tier) detection ─────────────────────────────────────────
+
+const ENTERPRISE_SIGNALS = [
+  'enterprise', 'strategic accounts', 'f500', 'fortune 500', 'global accounts',
+  'large enterprise', 'major accounts', 'named accounts', 'upmarket', 'strategic sales',
+  'enterprise sales', 'c-suite', 'exec-level',
+]
+
+const SMB_SIGNALS = [
+  'smb', 'small business', 'small and medium', 'startup', 'early stage',
+  'scale-up', 'scaleup', 'growth stage', 'series a', 'series b',
+]
+
+function detectSegment(text: string): 'enterprise' | 'smb' | 'mixed' | 'unknown' {
+  const lower = text.toLowerCase()
+  const ent = ENTERPRISE_SIGNALS.filter((s) => lower.includes(s)).length
+  const smb = SMB_SIGNALS.filter((s) => lower.includes(s)).length
+
+  if (ent >= 2 && smb < 2) return 'enterprise'
+  if (smb >= 2 && ent < 2) return 'smb'
+  if (ent >= 1 && smb >= 1) return 'mixed'
+  return 'unknown'
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -211,7 +328,7 @@ export function matchJD(
   const jdKeywords = [...roleKeywordsInJD, ...toolKeywordsInJD, ...generalKeywordsInJD]
 
   if (jdKeywords.length === 0) {
-    // JD uses non-standard language — return a neutral result
+    // JD uses non-standard language — can't compute a meaningful score
     return {
       matchScore: 0,
       jdKeywords: [],
@@ -222,6 +339,10 @@ export function matchJD(
         toolKeywords: { matched: [], missing: [] },
         generalKeywords: { matched: [], missing: [] },
       },
+      detectedJDRole: null,
+      roleAlignment: 'match',
+      segmentMismatch: false,
+      deductions: { role: 0, keywords: 0, tools: 0, segment: 0, total: 0 },
     }
   }
 
@@ -235,32 +356,52 @@ export function matchJD(
   const generalMatched = presentIn(cvRawText, generalKeywordsInJD)
   const generalMissing = absentFrom(cvRawText, generalKeywordsInJD)
 
-  // ── Step 3: Weighted match score ───────────────────────────────────────────
-  // Role keywords in JD  → weight 3 (highest signal)
-  // Tool keywords in JD  → weight 2
-  // General keywords     → weight 1
-  const WEIGHT_ROLE = 3
-  const WEIGHT_TOOL = 2
-  const WEIGHT_GENERAL = 1
-
-  const totalWeight =
-    roleKeywordsInJD.length * WEIGHT_ROLE +
-    toolKeywordsInJD.length * WEIGHT_TOOL +
-    generalKeywordsInJD.length * WEIGHT_GENERAL
-
-  const matchedWeight =
-    roleMatched.length * WEIGHT_ROLE +
-    toolMatched.length * WEIGHT_TOOL +
-    generalMatched.length * WEIGHT_GENERAL
-
-  const rawScore = totalWeight > 0 ? (matchedWeight / totalWeight) * 100 : 0
-  const matchScore = Math.round(Math.min(rawScore, 100))
-
-  // ── Step 4: Flatten matched / missing lists ────────────────────────────────
   const matchedKeywords = [...roleMatched, ...toolMatched, ...generalMatched]
   const missingKeywords = [...roleMissing, ...toolMissing, ...generalMissing]
 
-  // ── Step 5: Marketing subtype inference ───────────────────────────────────
+  // ── Step 3: v2 scoring — start at 100, deduct for gaps ────────────────────
+  //
+  // Deduction table:
+  //   Role mismatch (wrong role detected)         −25
+  //   Adjacent role (e.g. AE applying for SDR)   −12
+  //   Missing role keyword (from JD)              −3 each, max −30
+  //   Missing tool (from JD)                      −2 each, max −12
+  //   Segment mismatch (enterprise JD, SMB CV)    −8
+  //
+  // Floor: 0.  Ceiling: 100.
+
+  const DEDUCT_MISMATCH   = 25
+  const DEDUCT_ADJACENT   = 12
+  const DEDUCT_KW         = 3
+  const DEDUCT_TOOL       = 2
+  const CAP_KW            = 30
+  const CAP_TOOL          = 12
+  const DEDUCT_SEGMENT    = 8
+
+  // Role alignment
+  const detectedJDRole  = detectJDRole(jdText)
+  const roleAlignment   = detectedJDRole
+    ? getRoleAlignment(targetRole, detectedJDRole)
+    : 'match'  // can't detect → don't penalise
+
+  const roleDeduction = roleAlignment === 'mismatch' ? DEDUCT_MISMATCH
+    : roleAlignment === 'adjacent'  ? DEDUCT_ADJACENT
+    : 0
+
+  // Keyword & tool deductions
+  const kwDeduction   = Math.min(roleMissing.length  * DEDUCT_KW,   CAP_KW)
+  const toolDeduction = Math.min(toolMissing.length  * DEDUCT_TOOL, CAP_TOOL)
+
+  // Segment mismatch
+  const jdSegment  = detectSegment(jdText)
+  const cvSegment  = detectSegment(cvRawText)
+  const segmentMismatch = jdSegment === 'enterprise' && cvSegment === 'smb'
+  const segmentDeduction = segmentMismatch ? DEDUCT_SEGMENT : 0
+
+  const totalDeduction = roleDeduction + kwDeduction + toolDeduction + segmentDeduction
+  const matchScore = Math.max(100 - totalDeduction, 0)
+
+  // ── Step 4: Marketing subtype inference ───────────────────────────────────
   const marketingSubtype =
     targetRole === 'Marketing' ? inferMarketingSubtype(jdText) : undefined
 
@@ -275,5 +416,15 @@ export function matchJD(
       generalKeywords: { matched: generalMatched, missing: generalMissing },
     },
     marketingSubtype,
+    detectedJDRole,
+    roleAlignment,
+    segmentMismatch,
+    deductions: {
+      role:     roleDeduction,
+      keywords: kwDeduction,
+      tools:    toolDeduction,
+      segment:  segmentDeduction,
+      total:    totalDeduction,
+    },
   }
 }

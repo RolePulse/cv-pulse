@@ -23,16 +23,28 @@ interface MatchResponse {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function scoreColour(score: number): string {
-  if (score >= 75) return '#16A34A'  // green
-  if (score >= 50) return '#D97706'  // amber
+  if (score >= 80) return '#16A34A'  // green
+  if (score >= 60) return '#D97706'  // amber
   return '#DC2626'                    // red
 }
 
 function scoreLabel(score: number): string {
-  if (score >= 75) return 'Strong match'
-  if (score >= 50) return 'Partial match'
-  if (score > 0)   return 'Weak match'
+  if (score >= 85) return 'Strong match'
+  if (score >= 70) return 'Good match'
+  if (score >= 55) return 'Partial match'
+  if (score > 0)   return 'Needs tailoring'
   return 'No match detected'
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  SDR: 'SDR / BDR', AE: 'Account Executive', SE: 'Solutions Engineer',
+  CSM: 'Customer Success', Marketing: 'Marketing', Leadership: 'Leadership / VP', RevOps: 'RevOps',
+}
+
+const ALIGNMENT_CONFIG = {
+  match:    { icon: '✓', label: 'Role match',    colour: '#16A34A', bg: 'bg-green-50 border-green-200 text-green-700' },
+  adjacent: { icon: '⚠', label: 'Adjacent role', colour: '#D97706', bg: 'bg-amber-50 border-amber-200 text-amber-700' },
+  mismatch: { icon: '✗', label: 'Role mismatch', colour: '#DC2626', bg: 'bg-red-50 border-red-200 text-red-700' },
 }
 
 const SUBTYPE_LABELS: Record<string, string> = {
@@ -423,10 +435,13 @@ function JDMatchContent() {
 // ── Results component ─────────────────────────────────────────────────────────
 
 function MatchResults({ result }: { result: JDMatchResult }) {
-  const { matchScore, matchedKeywords, missingKeywords, breakdown, marketingSubtype } = result
+  const { matchScore, matchedKeywords, missingKeywords, breakdown, marketingSubtype,
+          detectedJDRole, roleAlignment, segmentMismatch, deductions } = result
   const colour = scoreColour(matchScore)
+  const alignCfg = ALIGNMENT_CONFIG[roleAlignment]
 
   const [showBreakdown, setShowBreakdown] = useState(false)
+  const [showDeductions, setShowDeductions] = useState(false)
 
   return (
     <div
@@ -455,12 +470,32 @@ function MatchResults({ result }: { result: JDMatchResult }) {
       </div>
 
       {/* Score bar */}
-      <div className="w-full bg-[#F0F0F0] rounded-full h-2 mb-5">
+      <div className="w-full bg-[#F0F0F0] rounded-full h-2 mb-4">
         <div
           className="h-2 rounded-full transition-all duration-500"
           style={{ width: `${matchScore}%`, backgroundColor: colour }}
         />
       </div>
+
+      {/* Role alignment badge */}
+      {matchScore > 0 && (
+        <div className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border mb-4 ${alignCfg.bg}`}>
+          <span>{alignCfg.icon}</span>
+          <span>{alignCfg.label}</span>
+          {detectedJDRole && (
+            <span className="font-normal opacity-80">
+              — JD detected as {ROLE_LABELS[detectedJDRole] ?? detectedJDRole}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Segment mismatch warning */}
+      {segmentMismatch && (
+        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-[6px] px-3 py-2 mb-4">
+          ⚠ The JD targets enterprise accounts but your CV signals SMB experience — consider highlighting any larger deal experience.
+        </div>
+      )}
 
       {/* Keyword summary */}
       <div className="grid grid-cols-2 gap-3 mb-5">
@@ -498,14 +533,61 @@ function MatchResults({ result }: { result: JDMatchResult }) {
         </div>
       )}
 
-      {/* Breakdown toggle */}
+      {/* Score deductions — toggleable transparency section */}
+      {matchScore > 0 && deductions.total > 0 && (
+        <div className="border-t border-[#EEEEEE] pt-3 mb-4">
+          <button
+            onClick={() => setShowDeductions((v) => !v)}
+            className="text-xs text-[#999999] hover:text-[#666666] focus:outline-none"
+          >
+            {showDeductions ? 'Hide score breakdown ↑' : 'How is this score calculated? ↓'}
+          </button>
+          {showDeductions && (
+            <div className="mt-3 space-y-1.5">
+              <p className="text-xs text-[#999999] mb-2">Starting score: 100</p>
+              {deductions.role > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#555555]">
+                    {roleAlignment === 'adjacent' ? 'Adjacent role (some gap between your experience and this JD)' : 'Role mismatch (your target role differs from this JD)'}
+                  </span>
+                  <span className="font-semibold text-[#DC2626]">−{deductions.role}</span>
+                </div>
+              )}
+              {deductions.keywords > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#555555]">Missing role keywords from JD</span>
+                  <span className="font-semibold text-[#DC2626]">−{deductions.keywords}</span>
+                </div>
+              )}
+              {deductions.tools > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#555555]">Missing tools mentioned in JD</span>
+                  <span className="font-semibold text-[#DC2626]">−{deductions.tools}</span>
+                </div>
+              )}
+              {deductions.segment > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#555555]">Segment mismatch (enterprise JD vs SMB background)</span>
+                  <span className="font-semibold text-[#DC2626]">−{deductions.segment}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-xs font-semibold border-t border-[#EEEEEE] pt-1.5 mt-1.5">
+                <span className="text-[#222222]">Final score</span>
+                <span style={{ color: colour }}>{matchScore}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Keyword breakdown toggle */}
       {result.jdKeywords.length > 0 && (
         <div className="border-t border-[#DDDDDD] pt-4">
           <button
             onClick={() => setShowBreakdown((v) => !v)}
             className="text-xs text-[#FF6B00] font-medium hover:underline focus:outline-none"
           >
-            {showBreakdown ? 'Hide breakdown ↑' : 'Show breakdown by category ↓'}
+            {showBreakdown ? 'Hide keyword breakdown ↑' : 'Show keyword breakdown by category ↓'}
           </button>
 
           {showBreakdown && (

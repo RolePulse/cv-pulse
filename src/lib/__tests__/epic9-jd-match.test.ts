@@ -75,6 +75,47 @@ Budget ownership experience preferred ($250k+ annually).
 Manage monthly webinars and coordinate content marketing efforts.
 `
 
+// A realistic SDR JD
+const SDR_JD = `
+Sales Development Representative
+
+We're looking for a motivated SDR / BDR to join our outbound sales team.
+
+Responsibilities:
+- Generate pipeline through outbound prospecting using cold calling and cold email sequences
+- Book qualified discovery meetings for Account Executives
+- Hit monthly quota for demos booked and meetings booked
+- Manage prospects in Salesforce and Outreach; use ZoomInfo for prospecting
+- Build and execute cadences in Salesloft; track connect rates in Gong
+- Qualify leads to SQL/MQL standards and maintain pipeline hygiene
+
+Requirements:
+- 1–2 years SDR or BDR experience
+- Familiarity with outbound tools: Outreach, Salesloft, ZoomInfo, Apollo
+- Strong cold calling and cold email skills
+- Comfortable working to quota and pipeline generation targets
+`
+
+// A Solutions Engineer JD (SE — different from SDR)
+const SE_JD = `
+Solutions Engineer — Pre-Sales
+
+We are looking for a Solutions Engineer (SE) to lead technical discovery and product demos.
+
+Responsibilities:
+- Lead proof of concept (POC) evaluations and technical discovery calls
+- Design solution architecture for enterprise clients; support RFP/RFI responses
+- Deliver compelling demos and value engineering presentations
+- Build ROI business cases and sandbox environments
+- Work closely with Account Executives to support deals
+
+Requirements:
+- 3+ years pre-sales or solutions engineering experience
+- Strong API and integration knowledge; cloud platform experience (AWS/Azure)
+- Experience with technical evaluation and MEDDIC qualification
+- Familiarity with Salesforce, Gong, Jira, Confluence, Loopio
+`
+
 // A bare-minimum JD with no recognisable keywords
 const GENERIC_JD = `
 We are looking for a talented professional to join our dynamic team.
@@ -115,6 +156,29 @@ describe('Epic 9 — JD Match engine', () => {
     const strongResult = matchJD(strongAECV, AE_JD, 'AE')
     const weakResult = matchJD(blankCV, AE_JD, 'AE')
     expect(strongResult.matchScore).toBeGreaterThan(weakResult.matchScore)
+  })
+
+  it('3b. SDR applying to SDR role with good keywords scores 80+', () => {
+    const result = matchJD(SDR_CV, SDR_JD, 'SDR')
+    expect(result.matchScore).toBeGreaterThanOrEqual(80)
+    expect(result.roleAlignment).toBe('match')
+    expect(result.detectedJDRole).toBe('SDR')
+  })
+
+  it('3c. Role mismatch (SDR CV for AE JD) reduces score vs same-role', () => {
+    const mismatchResult = matchJD(SDR_CV, AE_JD, 'AE')
+    const matchResult    = matchJD(SDR_CV, SDR_JD, 'SDR')
+    // Cross-role should score lower or same (SDR CV for AE JD gets role penalty)
+    expect(mismatchResult.matchScore).toBeLessThanOrEqual(matchResult.matchScore)
+  })
+
+  it('3d. Adjacent role gets smaller penalty than full mismatch', () => {
+    // SDR → AE is adjacent; SDR → Marketing is adjacent; SDR → SE is mismatch
+    const adjacentResult  = matchJD(SDR_CV, AE_JD,  'SDR')  // SDR applying to AE role
+    const mismatchResult  = matchJD(SDR_CV, SE_JD,  'SDR')  // SDR applying to SE role
+    expect(adjacentResult.roleAlignment).toBe('adjacent')
+    expect(mismatchResult.roleAlignment).toBe('mismatch')
+    expect(adjacentResult.deductions.role).toBeLessThan(mismatchResult.deductions.role)
   })
 
   it('4. matchedKeywords + missingKeywords = jdKeywords (no keyword lost)', () => {

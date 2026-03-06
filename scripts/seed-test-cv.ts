@@ -50,7 +50,7 @@ async function run() {
   
   const buckets = {
     proof_of_impact: result.buckets.proofOfImpact.score,
-    ats_keywords: result.buckets.atsKeywords.score,
+    ats_keywords: 0, // removed from general score 2026-03-06
     formatting: result.buckets.formatting.score,
     clarity: result.buckets.clarity.score,
   }

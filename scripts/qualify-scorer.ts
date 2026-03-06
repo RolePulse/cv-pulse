@@ -36,7 +36,7 @@ async function main() {
     console.log(SEP)
     console.log(`FILE:  ${file}`)
     console.log(`SCORE: ${r.overallScore}/100 | ${r.passFail ? '✅ PASS' : '❌ FAIL'}`)
-    console.log(`       Impact ${r.buckets.proofOfImpact.score}/35 · ATS ${r.buckets.atsKeywords.score}/25 · Format ${r.buckets.formatting.score}/20 · Clarity ${r.buckets.clarity.score}/20`)
+    console.log(`       Impact ${r.buckets.proofOfImpact.score}/47 · Format ${r.buckets.formatting.score}/27 · Clarity ${r.buckets.clarity.score}/26`)
 
     if (r.criticalConcerns.length) {
       console.log(`\n⛔ CRITICAL CONCERNS:`)
@@ -51,13 +51,10 @@ async function main() {
       console.log(`      WHY:    ${f.whyItMatters}`)
     })
 
-    console.log(`\n🔑 KEYWORDS (${r.keywordData.matched.length}/${r.keywordData.total} matched):`)
-    console.log(`   ✅ ${r.keywordData.matched.length > 0 ? r.keywordData.matched.join(', ') : 'none'}`)
-    console.log(`   ❌ ${r.keywordData.missing.slice(0,12).join(', ')}${r.keywordData.missing.length > 12 ? `... (+${r.keywordData.missing.length-12} more)` : ''}`)
+    // Keywords removed from general score (2026-03-06) — now only in JD Match
 
     const allIssues = [
       ...r.buckets.proofOfImpact.issues.map(i => `[impact] ${i}`),
-      ...r.buckets.atsKeywords.issues.map(i => `[ats] ${i}`),
       ...r.buckets.formatting.issues.map(i => `[format] ${i}`),
       ...r.buckets.clarity.issues.map(i => `[clarity] ${i}`),
     ]
@@ -68,7 +65,6 @@ async function main() {
 
     const allWins = [
       ...r.buckets.proofOfImpact.positives.map(i => `[impact] ${i}`),
-      ...r.buckets.atsKeywords.positives.map(i => `[ats] ${i}`),
       ...r.buckets.formatting.positives.map(i => `[format] ${i}`),
       ...r.buckets.clarity.positives.map(i => `[clarity] ${i}`),
     ]

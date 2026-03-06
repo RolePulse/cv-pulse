@@ -254,13 +254,10 @@ section('5. Adding role keywords to skills improves ATS score')
   const r1 = scoreCV(parseText(noSkillsRaw).structured, noSkillsRaw, 'CSM')
   const r2 = scoreCV(parseText(skillsRaw).structured, skillsRaw, 'CSM')
 
+  // ATS keywords bucket removed from general score (2026-03-06) — keywords now only in JD Match
   assert(
-    r2.buckets.atsKeywords.score > r1.buckets.atsKeywords.score,
-    `Adding skills improves ATS score (${r1.buckets.atsKeywords.score} → ${r2.buckets.atsKeywords.score})`
-  )
-  assert(
-    r2.keywordData.matched.length > r1.keywordData.matched.length,
-    `More keywords matched (${r1.keywordData.matched.length} → ${r2.keywordData.matched.length})`
+    !('atsKeywords' in r2.buckets),
+    'No atsKeywords bucket in general score (expected — keywords moved to JD Match)'
   )
 }
 

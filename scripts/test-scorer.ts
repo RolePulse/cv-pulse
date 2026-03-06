@@ -120,11 +120,11 @@ Education: Diploma, Local College, 2020
 
 function printResult(label: string, result: ReturnType<typeof scoreCV>) {
   console.log(`  Score: ${result.overallScore}/100 | ${result.passFail ? '✅ PASS' : '❌ FAIL'}`)
-  console.log(`  Impact: ${result.buckets.proofOfImpact.score}/35 | ATS: ${result.buckets.atsKeywords.score}/25 | Format: ${result.buckets.formatting.score}/20 | Clarity: ${result.buckets.clarity.score}/20`)
+  console.log(`  Impact: ${result.buckets.proofOfImpact.score}/47 | Format: ${result.buckets.formatting.score}/27 | Clarity: ${result.buckets.clarity.score}/26`)
   if (result.criticalConcerns.length) {
     console.log(`  ⚠️  Critical: ${result.criticalConcerns.join(' | ')}`)
   }
-  console.log(`  Keywords: ${result.keywordData.matched.length}/${result.keywordData.total} matched`)
+  // Keywords removed from general score (2026-03-06) — shown only in JD Match
   console.log(`  Checklist: ${result.checklist.length} items, ${result.checklist.filter(c => c.done).length} done`)
   if (result.checklist.filter(c => !c.done).length > 0) {
     const topFixes = result.checklist.filter(c => !c.done).slice(0, 3)
@@ -206,7 +206,7 @@ async function main() {
       }
       const result = scoreCV(parsed.structured, parsed.rawText, 'CSM')
       const flag = result.overallScore >= 40 ? '✅' : '⚠️'
-      console.log(`  ${flag} ${file.slice(0, 38).padEnd(38)} → ${String(result.overallScore).padStart(3)}/100 | Impact:${result.buckets.proofOfImpact.score} ATS:${result.buckets.atsKeywords.score} Format:${result.buckets.formatting.score} Clarity:${result.buckets.clarity.score}`)
+      console.log(`  ${flag} ${file.slice(0, 38).padEnd(38)} → ${String(result.overallScore).padStart(3)}/100 | Impact:${result.buckets.proofOfImpact.score} Format:${result.buckets.formatting.score} Clarity:${result.buckets.clarity.score}`)
     }
     console.log()
   }

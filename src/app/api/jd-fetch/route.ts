@@ -93,6 +93,59 @@ function extractText(html: string): string {
     .trim()
 }
 
+// ── Content quality check ─────────────────────────────────────────────────────
+// Returns true only if the text looks like a real job description, not page chrome.
+
+function looksLikeJobDescription(text: string): boolean {
+  const lower = text.toLowerCase()
+
+  // Hard-fail: unrendered template syntax or obvious page furniture
+  const NOISE = [
+    '{{',                       // Vue/Handlebars template literals not rendered
+    'we use cookies',
+    'cookie policy',
+    'accept cookies',
+    'share this opportunity',
+    'similar opportunities',
+    'privacy policy',
+    'terms of service',
+  ]
+  if (NOISE.some((n) => lower.includes(n))) return false
+
+  // Must be long enough to contain a real JD (nav-only pages are typically short)
+  if (text.length < 400) return false
+
+  // Must contain at least 2 real job-description signals
+  const JD_SIGNALS = [
+    'responsibilit',  // responsibilities / responsible
+    'requirement',    // requirements / required
+    'qualification',
+    'experience',
+    'skills',
+    'about the role',
+    'about the position',
+    'what you',
+    "you'll",
+    'you will',
+    'we are looking',
+    "we're looking",
+    'job description',
+    'about us',
+    'about the company',
+    'compensation',
+    'salary',
+    'benefits',
+    'full-time',
+    'part-time',
+    ' remote',
+    ' hybrid',
+    'apply now',
+    'apply today',
+  ]
+  const signalCount = JD_SIGNALS.filter((s) => lower.includes(s)).length
+  return signalCount >= 2
+}
+
 // ── ATS-specific helpers ──────────────────────────────────────────────────────
 
 /**
@@ -267,10 +320,12 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Return result ─────────────────────────────────────────────────────────
-  if (text.length < 100) {
+  if (!looksLikeJobDescription(text)) {
+    // Either too short, contains page-chrome noise (cookie banners, nav, share buttons),
+    // or lacks the signals that identify real job description content.
     return NextResponse.json({
       ok: false,
-      error: "Couldn't read that job page — it may require JavaScript or a sign-in. Paste the job description text instead.",
+      error: "Couldn't extract the job description from that page — it may be built with JavaScript or require a sign-in. Paste the job description text instead.",
     }, { status: 422 })
   }
 

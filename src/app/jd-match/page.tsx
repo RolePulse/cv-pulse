@@ -322,7 +322,7 @@ function JDMatchContent() {
           {!isPaywalled && (
             <div className="mb-4">
               <label className="block text-sm font-medium text-[#222222] mb-1.5">
-                Job posting URL <span className="text-[#999999] font-normal text-xs ml-1">Greenhouse, Lever, Ashby, and most career pages</span>
+                Job posting URL <span className="text-[#999999] font-normal text-xs ml-1">Greenhouse works best — most other pages need text paste</span>
               </label>
               <div className="flex gap-2">
                 <input
